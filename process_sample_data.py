@@ -44,7 +44,7 @@ def process_real_data():
         })
         
     start = time.time()
-    resp_p = requests.post(f"{API_BASE_URL}/patient/analyze_bulk", json=patients_payload)
+    resp_p = requests.post(f"{API_BASE_URL}/patient/analyze_bulk", json=patients_payload, timeout=60)
     elapsed_p = (time.time() - start) * 1000
     
     if resp_p.status_code == 200:
@@ -79,7 +79,7 @@ def process_real_data():
             "total_patients_current": int(row['total_patients_current'])
         }
         
-        resp_h = requests.post(f"{API_BASE_URL}/hospital/stress", json=hospital_payload)
+        resp_h = requests.post(f"{API_BASE_URL}/hospital/stress", json=hospital_payload, timeout=10)
         if resp_h.status_code == 200:
             hospital_results.append(resp_h.json())
         else:

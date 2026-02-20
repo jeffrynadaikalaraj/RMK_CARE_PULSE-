@@ -55,7 +55,7 @@ def run_tests():
     
     start_time = time.time()
     try:
-        resp_p = requests.post(f"{API_BASE_URL}/patient/analyze", json=sample_patient)
+        resp_p = requests.post(f"{API_BASE_URL}/patient/analyze", json=sample_patient, timeout=10)
         elapsed_p = (time.time() - start_time) * 1000
         print(f"\nResponse (Latency: {elapsed_p:.2f} ms): O(n) Execution")
         print(json.dumps(resp_p.json(), indent=2))
@@ -68,7 +68,7 @@ def run_tests():
     
     start_time = time.time()
     try:
-        resp_h = requests.post(f"{API_BASE_URL}/hospital/stress", json=sample_hospital)
+        resp_h = requests.post(f"{API_BASE_URL}/hospital/stress", json=sample_hospital, timeout=10)
         elapsed_h = (time.time() - start_time) * 1000
         print(f"\nResponse (Latency: {elapsed_h:.2f} ms): O(1) Execution")
         print(json.dumps(resp_h.json(), indent=2))

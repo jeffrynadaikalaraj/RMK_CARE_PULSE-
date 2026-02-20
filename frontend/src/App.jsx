@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import * as XLSX from "xlsx";
+import readXlsxFile from "read-excel-file";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis,
@@ -196,17 +196,24 @@ function UploadScreen({ onLoad }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const parseXlsx = (file) => new Promise((res, rej) => {
-    const reader = new FileReader();
-    reader.onload = e => {
-      try {
-        const wb = XLSX.read(e.target.result, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        res(XLSX.utils.sheet_to_json(ws));
-      } catch (err) { rej(err); }
-    };
-    reader.readAsArrayBuffer(file);
-  });
+  const parseXlsx = async (file) => {
+    try {
+      const rows = await readXlsxFile(file);
+      if (!rows || rows.length === 0) return [];
+      const headers = rows[0];
+      const data = [];
+      for (let i = 1; i < rows.length; i++) {
+        const rowData = {};
+        for (let j = 0; j < headers.length; j++) {
+          rowData[headers[j]] = rows[i][j];
+        }
+        data.push(rowData);
+      }
+      return data;
+    } catch (err) {
+      throw err;
+    }
+  };
 
   const handleProcess = async () => {
     if (!patFile || !hosFile) { setError("Please upload both files."); return; }

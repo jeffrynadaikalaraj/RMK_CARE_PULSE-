@@ -26,7 +26,7 @@ def test_extreme_patient():
         "admission_type": "ER",
         "diagnosis_category": "Respiratory"
     }
-    resp = requests.post(f"{API_BASE_URL}/patient/analyze", json=data)
+    resp = requests.post(f"{API_BASE_URL}/patient/analyze", json=data, timeout=10)
     result = resp.json()
     print(json.dumps(result, indent=2))
     assert result["final_risk_score"] <= 100.0, "Score exceeded mathematical bounds!"
@@ -55,7 +55,7 @@ def test_normal_patient():
         "admission_type": "General",
         "diagnosis_category": "Checkup"
     }
-    resp = requests.post(f"{API_BASE_URL}/patient/analyze", json=data)
+    resp = requests.post(f"{API_BASE_URL}/patient/analyze", json=data, timeout=10)
     result = resp.json()
     print(json.dumps(result, indent=2))
     assert result["final_risk_score"] == 0.0, "Normal patient should have 0.0 score!"
@@ -72,7 +72,7 @@ def test_bulk_processing_o_n():
         for i in range(1000)
     ]
     start = time.time()
-    resp = requests.post(f"{API_BASE_URL}/patient/analyze_bulk", json=patients)
+    resp = requests.post(f"{API_BASE_URL}/patient/analyze_bulk", json=patients, timeout=30)
     elapsed = (time.time() - start) * 1000
     print(f"Processed 1000 patients in {elapsed:.2f} ms")
     assert resp.status_code == 200, "Bulk endpoint failed!"
@@ -98,7 +98,7 @@ def test_hospital_extreme_stress():
         "oxygen_supply_level_percent": 10,
         "total_patients_current": 180
     }
-    resp = requests.post(f"{API_BASE_URL}/hospital/stress", json=data)
+    resp = requests.post(f"{API_BASE_URL}/hospital/stress", json=data, timeout=10)
     result = resp.json()
     print(json.dumps(result, indent=2))
     assert result["hospital_stress_index"] > 0.9, "HSI should be very high!"
