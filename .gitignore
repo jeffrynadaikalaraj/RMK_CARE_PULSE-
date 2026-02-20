@@ -1,0 +1,27 @@
+# Environments
+venv/
+env/
+.env
+__pycache__/
+
+# Mac OS
+.DS_Store
+
+# Logs
+*.log
+backend.log
+
+# Frontend generated/modules
+node_modules/
+dist/
+.vite/
+npm-debug.log
+
+# Generated outputs
+*.csv
+Output_Hospital_Stress.csv
+Output_Patient_Analysis.csv
+
+# IDE
+.vscode/
+.idea/
