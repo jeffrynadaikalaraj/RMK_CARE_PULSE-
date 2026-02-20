@@ -5,7 +5,6 @@ import {
   PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis,
   LineChart, Line, Legend, AreaChart, Area
 } from "recharts";
-import { GoogleLogin } from "@react-oauth/google";
 import axios from "axios";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -325,11 +324,11 @@ function LoginScreen({ onLogin }) {
     setError("");
     try {
       // Updated to match clinical production endpoint
-      const res = await axios.post("http://localhost:8000/request-otp", { email });
-      if (res.data.message.includes("successfully")) {
+      const res = await axios.post("http://localhost:8000/api/v1/auth/otp/send", { email });
+      if (res.status === 200 || res.data) {
         setShowOtpField(true);
       } else {
-        setError(res.data.detail || "Failed to send code");
+        setError("Failed to send code");
       }
     } catch (err) {
       setError(err.response?.data?.detail || err.message);
@@ -344,7 +343,7 @@ function LoginScreen({ onLogin }) {
     setError("");
     try {
       // Updated to match clinical production endpoint
-      const res = await axios.post("http://localhost:8000/verify-otp", { email, otp });
+      const res = await axios.post("http://localhost:8000/api/v1/auth/otp/verify", { email, otp });
       if (res.data.success) {
         // We received JWT and clinical data
         onLogin(res.data.user, res.data.stored_data);
@@ -386,22 +385,7 @@ function LoginScreen({ onLogin }) {
 
           {!showOtpField ? (
             <>
-              <div style={{ display: "flex", justifyContent: "center" }}>
-                <GoogleLogin
-                  onSuccess={handleLoginSuccess}
-                  onError={() => setError("Google Auth Failed")}
-                  useOneTap
-                  theme="filled_blue"
-                  shape="pill"
-                  text={view === "login" ? "signin_with" : "signup_with"}
-                />
-              </div>
 
-              <div className="divider" style={{ display: "flex", alignItems: "center", color: "#475569", fontSize: "0.75rem", margin: "1.5rem 0", textTransform: "uppercase", letterSpacing: "1px" }}>
-                <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 1rem" }}></div>
-                or use email otp
-                <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 1rem" }}></div>
-              </div>
 
               <div style={{ textAlign: "left" }}>
                 <div style={{ color: "#64748B", fontSize: "0.8rem", marginBottom: "0.5rem", fontWeight: 500 }}>Email Address</div>

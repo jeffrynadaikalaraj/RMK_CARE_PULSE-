@@ -15,6 +15,8 @@ import json
 import random
 import time
 import aiosmtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 load_dotenv()
 
