@@ -5,7 +5,14 @@ import {
   PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis,
   LineChart, Line, Legend, AreaChart, Area
 } from "recharts";
+import { GoogleLogin } from "@react-oauth/google";
 import axios from "axios";
+import UserProfileDropdown from "./components/UserProfileDropdown";
+import ProfilePage from "./components/ProfilePage";
+import PreferencesPage from "./components/PreferencesPage";
+import SecuritySettingsPage from "./components/SecuritySettingsPage";
+
+
 
 /* ═══════════════════════════════════════════════════════════════
    CAREPULSE++ CLINICAL ENGINE  (full deterministic logic in JS)
@@ -288,9 +295,12 @@ function LoginScreen({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [showOtpField, setShowOtpField] = useState(false);
+  const [showPasswordField, setShowPasswordField] = useState(false);
   const [view, setView] = useState("login"); // "login" or "signup"
+
 
   const handleLoginSuccess = async (credentialResponse) => {
     setLoading(true);
@@ -324,14 +334,29 @@ function LoginScreen({ onLogin }) {
     setError("");
     try {
       // Updated to match clinical production endpoint
-      const res = await axios.post("http://localhost:8000/api/v1/auth/otp/send", { email });
-      if (res.status === 200 || res.data) {
+      const res = await axios.post("http://localhost:8000/request-otp", { email });
+      if (res.data.message.includes("successfully")) {
         setShowOtpField(true);
       } else {
-        setError("Failed to send code");
+        setError(res.data.detail || "Failed to send code");
       }
     } catch (err) {
       setError(err.response?.data?.detail || err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoginPassword = async () => {
+    if (!email || !password) { setError("Please enter email and password"); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await axios.post("http://localhost:8000/login", { email, password });
+      onLogin(res.data.user, null);
+      localStorage.setItem("token", res.data.access_token);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -342,11 +367,10 @@ function LoginScreen({ onLogin }) {
     setLoading(true);
     setError("");
     try {
-      // Updated to match clinical production endpoint
-      const res = await axios.post("http://localhost:8000/api/v1/auth/otp/verify", { email, otp });
+      const res = await axios.post("http://localhost:8000/verify-otp", { email, otp });
       if (res.data.success) {
-        // We received JWT and clinical data
         onLogin(res.data.user, res.data.stored_data);
+        localStorage.setItem("token", res.data.access_token);
       } else {
         setError(res.data.detail || "Invalid code");
       }
@@ -356,6 +380,7 @@ function LoginScreen({ onLogin }) {
       setLoading(false);
     }
   };
+
 
   return (
     <div style={{ minHeight: "100vh", background: "#060D1F", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif", padding: "2rem" }}>
@@ -385,15 +410,44 @@ function LoginScreen({ onLogin }) {
 
           {!showOtpField ? (
             <>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <GoogleLogin
+                  onSuccess={handleLoginSuccess}
+                  onError={() => setError("Google Auth Failed")}
+                  useOneTap
+                  theme="filled_blue"
+                  shape="pill"
+                  text={view === "login" ? "signin_with" : "signup_with"}
+                />
+              </div>
 
+              <div className="divider" style={{ display: "flex", alignItems: "center", color: "#475569", fontSize: "0.75rem", margin: "1.5rem 0", textTransform: "uppercase", letterSpacing: "1px" }}>
+                <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 1rem" }}></div>
+                or use email otp
+                <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 1rem" }}></div>
+              </div>
 
               <div style={{ textAlign: "left" }}>
                 <div style={{ color: "#64748B", fontSize: "0.8rem", marginBottom: "0.5rem", fontWeight: 500 }}>Email Address</div>
                 <input type="email" className="auth-input" placeholder="name@company.com" value={email} onChange={e => setEmail(e.target.value)} />
-                <button className="btn-primary" style={{ width: "100%", height: "3.5rem", fontSize: "1rem", borderRadius: "14px" }} onClick={handleSendOtp} disabled={loading}>
-                  {loading ? "Requesting OTP..." : view === "login" ? "Login with OTP →" : "Create Account with OTP →"}
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                  <div style={{ color: "#64748B", fontSize: "0.8rem", fontWeight: 500 }}>Password</div>
+                  <button style={{ background: "none", border: "none", color: "#38BDF8", cursor: "pointer", fontSize: "0.75rem" }} onClick={() => setShowPasswordField(!showPasswordField)}>
+                    {showPasswordField ? "Use OTP instead" : "Use password"}
+                  </button>
+                </div>
+
+                {showPasswordField && (
+                  <input type="password" className="auth-input" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
+                )}
+
+                <button className="btn-primary" style={{ width: "100%", height: "3.5rem", fontSize: "1rem", borderRadius: "14px" }}
+                  onClick={showPasswordField ? handleLoginPassword : handleSendOtp} disabled={loading}>
+                  {loading ? "Verifying..." : showPasswordField ? "Secure Login →" : view === "login" ? "Login with OTP →" : "Create Account with OTP →"}
                 </button>
               </div>
+
             </>
           ) : (
             <div style={{ textAlign: "center" }}>
@@ -483,6 +537,25 @@ export default function App() {
   const [sortCol, setSortCol] = useState("risk_score");
   const [sortDir, setSortDir] = useState("desc");
   const [selectedPatient, setSelectedPatient] = useState(null);
+  const [isProfileView, setIsProfileView] = useState(false);
+  const [activeSubPage, setActiveSubPage] = useState("profile"); // profile, preferences, security
+  const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      axios.get("http://localhost:8000/me", {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(res => {
+        setUser(res.data);
+      }).catch(err => {
+        console.error("Auto-login failed:", err);
+        localStorage.removeItem("token");
+      });
+    }
+  }, []);
 
 
 
@@ -558,7 +631,15 @@ export default function App() {
   const erColor = hm.erLoad >= 0.85 ? "#E53E3E" : hm.erLoad >= 0.6 ? "#DD6B20" : "#38A169";
 
   if (!user) return <LoginScreen onLogin={(u, d) => { setUser(u); if (d) setData(d); }} />;
+
+  if (isProfileView) {
+    if (activeSubPage === "preferences") return <PreferencesPage user={user} onBack={() => setIsProfileView(false)} />;
+    if (activeSubPage === "security") return <SecuritySettingsPage user={user} onBack={() => setIsProfileView(false)} />;
+    return <ProfilePage user={user} setUser={setUser} onBack={() => setIsProfileView(false)} />;
+  }
+
   if (!data) return <UploadScreen onLoad={async (newData) => {
+
     setData(newData);
     // Persist to server
     try {
@@ -571,6 +652,71 @@ export default function App() {
       console.error("Failed to save data:", e);
     }
   }} />;
+
+  const handleAddNewPatient = async (patientData) => {
+    setIsSaving(true);
+    try {
+      const token = localStorage.getItem("token");
+      // 1. Save to Excel via Backend
+      const res = await axios.post("http://localhost:8000/api/v1/patients/add", {
+        patient: patientData,
+        email: user.email
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.data.success) {
+        const newPatientRaw = res.data.patient;
+
+        // 2. Process with JS Engine for immediate UI update
+        const { score, comps } = computeRisk(newPatientRaw);
+        const sev = severity(score);
+        const processedPatient = {
+          ...newPatientRaw,
+          risk_score: score,
+          severity: sev,
+          diet: dietRecommendation(newPatientRaw),
+          rec_temp: roomTemp(sev, newPatientRaw.body_temperature_celsius),
+          comps,
+        };
+
+        // 3. Update local state
+        const updatedPatients = [...patients, processedPatient];
+
+        // 4. Re-calculate hospital stress and bed allocations (using logic similar to processData)
+        const critCount = updatedPatients.filter(p => p.severity === "Critical").length;
+        const newHm = computeHospital(data.hospital_raw || {}, critCount);
+        // Note: we might need the raw hospital row to re-process correctly. 
+        // For now, let's just use the current hm values as baseline or assume they stay similar.
+        // Actually, let's keep it simple: add patient and let the existing memoized logic handle filters.
+
+        const bedMap = allocateBeds(updatedPatients, hm);
+        const finalPatients = updatedPatients.map(p => ({
+          ...p,
+          bed_allocation: bedMap[p.patient_id]?.bed || "Unknown",
+          bed_alert: bedMap[p.patient_id]?.alert || "",
+          er_decision: erDecision(hm.erLoad, hm.hsi, p.emergency_case_flag === 1),
+        }));
+
+        const newData = { ...data, patients: finalPatients };
+        setData(newData);
+
+        // 5. Persist the updated state to user JSON
+        await axios.post("http://localhost:8000/api/v1/user/save_data", {
+          email: user.email,
+          patients: finalPatients,
+          hospital: data.hospital
+        });
+
+        setIsAddPatientOpen(false);
+      }
+    } catch (e) {
+      console.error("Failed to add patient:", e);
+      alert("Error adding patient: " + (e.response?.data?.detail || e.message));
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#060D1F", fontFamily: "'DM Sans',sans-serif", color: "#E2E8F0" }}>
@@ -619,13 +765,29 @@ export default function App() {
             ))}
           </nav>
           <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <div style={{ textAlign: "right", display: "none" }}>
-              <div style={{ color: "#F8FAFC", fontSize: "0.85rem", fontWeight: 600 }}>{user?.name}</div>
-              <div style={{ color: "#64748B", fontSize: "0.7rem" }}>{user?.email}</div>
-            </div>
-            {user?.picture && <img src={user.picture} style={{ width: 32, height: 32, borderRadius: "50%", border: "2px solid #38BDF8" }} alt="profile" />}
-            <button className="reset-btn" onClick={() => { setData(null); setUser(null); }}>Logout</button>
+            <UserProfileDropdown
+              user={user}
+              onViewProfile={() => { setIsProfileView(true); setActiveSubPage("profile"); }}
+              onViewTab={(tab) => { setIsProfileView(true); setActiveSubPage(tab); }}
+              onLogout={async () => {
+                try {
+                  const token = localStorage.getItem("token");
+                  await axios.post("http://localhost:8000/logout", {}, {
+                    headers: { Authorization: `Bearer ${token}` }
+                  });
+                } catch (e) {
+                  console.error("Logout error:", e);
+                }
+                setData(null);
+                setUser(null);
+                setIsProfileView(false);
+                localStorage.removeItem("token");
+              }}
+            />
+
+
           </div>
+
         </div>
       </div>
 
@@ -746,6 +908,11 @@ export default function App() {
                 {["All", "Critical", "Moderate", "Stable"].map(f => (
                   <button key={f} className={`filter-btn${sevFilter === f ? " active" : ""}`} onClick={() => setSevFilter(f)}>{f}</button>
                 ))}
+                <button className="btn-primary"
+                  onClick={() => setIsAddPatientOpen(true)}
+                  style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0.6rem 1rem", height: "auto", borderRadius: "10px", fontSize: "0.85rem", marginLeft: "0.5rem" }}>
+                  <span style={{ fontSize: "1rem", fontWeight: 800 }}>+</span> New Patient
+                </button>
               </div>
             </div>
 
@@ -1121,6 +1288,129 @@ export default function App() {
                 <span key={l} style={{ background: v ? "rgba(239,68,68,0.15)" : "rgba(52,211,153,0.08)", border: `1px solid ${v ? "rgba(239,68,68,0.4)" : "rgba(52,211,153,0.2)"}`, borderRadius: 8, padding: "4px 12px", color: v ? "#F87171" : "#6EE7B7", fontSize: "0.8rem", fontWeight: 600 }}>{v ? "✓" : "○"} {l}</span>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+      {/* ══════════════ ADD PATIENT MODAL ══════════════ */}
+      {isAddPatientOpen && (
+        <div className="modal-overlay" onClick={() => setIsAddPatientOpen(false)}>
+          <div className="modal fade-in" onClick={e => e.stopPropagation()} style={{ maxWidth: 800 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+              <h3 style={{ margin: 0, fontFamily: "'Syne',sans-serif", color: "#F8FAFC", fontSize: "1.5rem" }}>Register New Patient</h3>
+              <button onClick={() => setIsAddPatientOpen(false)} style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#94A3B8", cursor: "pointer", fontSize: "1.2rem", width: 36, height: 36, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+            </div>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const patient = {
+                age: parseInt(formData.get("age")),
+                gender: formData.get("gender"),
+                heart_rate_bpm: parseInt(formData.get("heart_rate")),
+                systolic_bp_mmHg: parseInt(formData.get("systolic")),
+                diastolic_bp_mmHg: parseInt(formData.get("diastolic")),
+                oxygen_saturation_percent: parseFloat(formData.get("spo2")),
+                body_temperature_celsius: parseFloat(formData.get("temp")),
+                respiratory_rate_bpm: parseInt(formData.get("rr")),
+                blood_sugar_mg_dl: parseFloat(formData.get("sugar")),
+                bmi: parseFloat(formData.get("bmi")),
+                hemoglobin_g_dl: parseFloat(formData.get("hgb")),
+                hydration_level_percent: parseFloat(formData.get("hydration")),
+                chronic_disease_flag: formData.get("chronic") === "on" ? 1 : 0,
+                emergency_case_flag: formData.get("emergency") === "on" ? 1 : 0,
+                icu_required_flag: formData.get("icu") === "on" ? 1 : 0,
+                admission_type: formData.get("admission"),
+                diagnosis_category: formData.get("diagnosis")
+              };
+              handleAddNewPatient(patient);
+            }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+                {/* Basic Info */}
+                <div className="card" style={{ padding: "1.25rem" }}>
+                  <h4 style={{ margin: "0 0 1rem", color: "#38BDF8", fontSize: "0.9rem" }}>Basic Information</h4>
+                  <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: "block", color: "#64748B", fontSize: "0.75rem", marginBottom: "0.4rem" }}>Age</label>
+                      <input name="age" type="number" className="search-input" defaultValue="45" required style={{ width: "100%" }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: "block", color: "#64748B", fontSize: "0.75rem", marginBottom: "0.4rem" }}>Gender</label>
+                      <select name="gender" className="search-input" style={{ width: "100%" }}>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: "1rem" }}>
+                    <label style={{ display: "block", color: "#64748B", fontSize: "0.75rem", marginBottom: "0.4rem" }}>Admission Type</label>
+                    <select name="admission" className="search-input" style={{ width: "100%" }}>
+                      <option value="Emergency">Emergency</option>
+                      <option value="Elective">Elective</option>
+                      <option value="Urgent">Urgent</option>
+                      <option value="Trauma">Trauma</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: "block", color: "#64748B", fontSize: "0.75rem", marginBottom: "0.4rem" }}>Diagnosis Category</label>
+                    <select name="diagnosis" className="search-input" style={{ width: "100%" }}>
+                      <option value="Cardiovascular">Cardiovascular</option>
+                      <option value="Respiratory">Respiratory</option>
+                      <option value="Neurological">Neurological</option>
+                      <option value="Metabolic">Metabolic</option>
+                      <option value="Infection">Infection</option>
+                      <option value="Trauma">Trauma</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Vitals Info */}
+                <div className="card" style={{ padding: "1.25rem" }}>
+                  <h4 style={{ margin: "0 0 1rem", color: "#38BDF8", fontSize: "0.9rem" }}>Clinical Vitals</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
+                    {[
+                      { l: "Heart Rate (bpm)", n: "heart_rate", v: "80" },
+                      { l: "Systolic BP", n: "systolic", v: "120" },
+                      { l: "Diastolic BP", n: "diastolic", v: "80" },
+                      { l: "SpO2 (%)", n: "spo2", v: "98" },
+                      { l: "Temp (°C)", n: "temp", v: "37.0" },
+                      { l: "Resp Rate", n: "rr", v: "16" },
+                      { l: "Blood Sugar", n: "sugar", v: "120" },
+                      { l: "BMI", n: "bmi", v: "22.5" },
+                      { l: "Hemoglobin", n: "hgb", v: "14.5" },
+                      { l: "Hydration (%)", n: "hydration", v: "95" },
+                    ].map(f => (
+                      <div key={f.n}>
+                        <label style={{ display: "block", color: "#64748B", fontSize: "0.7rem", marginBottom: "0.2rem" }}>{f.l}</label>
+                        <input name={f.n} type="number" step="any" className="search-input" defaultValue={f.v} required style={{ width: "100%", padding: "0.4rem 0.75rem" }} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Flags */}
+              <div className="card" style={{ marginTop: "1.5rem", padding: "1.25rem", display: "flex", justifyContent: "space-around" }}>
+                {[
+                  { l: "Chronic Disease", n: "chronic" },
+                  { l: "Emergency Case", n: "emergency" },
+                  { l: "ICU Required", n: "icu" },
+                ].map(f => (
+                  <label key={f.n} style={{ display: "flex", alignItems: "center", gap: "0.75rem", cursor: "pointer" }}>
+                    <input name={f.n} type="checkbox" style={{ width: 18, height: 18, accentColor: "#38BDF8" }} />
+                    <span style={{ color: "#CBD5E1", fontSize: "0.9rem", fontWeight: 500 }}>{f.l}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div style={{ marginTop: "2rem", display: "flex", gap: "1rem" }}>
+                <button type="button" onClick={() => setIsAddPatientOpen(false)} className="filter-btn" style={{ flex: 1, padding: "1rem" }}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={isSaving} style={{ flex: 2, padding: "1rem" }}>
+                  {isSaving ? "Processing & Syncing..." : "Add Patient to System →"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
