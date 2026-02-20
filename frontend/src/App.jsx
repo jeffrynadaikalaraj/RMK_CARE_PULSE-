@@ -5,6 +5,8 @@ import {
   PieChart, Pie, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis,
   LineChart, Line, Legend, AreaChart, Area
 } from "recharts";
+import { GoogleLogin } from "@react-oauth/google";
+import axios from "axios";
 
 /* ═══════════════════════════════════════════════════════════════
    CAREPULSE++ CLINICAL ENGINE  (full deterministic logic in JS)
@@ -281,6 +283,179 @@ function UploadScreen({ onLoad }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   LOGIN SCREEN
+═══════════════════════════════════════════════════════════════ */
+function LoginScreen({ onLogin }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [showOtpField, setShowOtpField] = useState(false);
+  const [view, setView] = useState("login"); // "login" or "signup"
+
+  const handleLoginSuccess = async (credentialResponse) => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await axios.post("http://localhost:8000/api/v1/auth/google", {
+        token: credentialResponse.credential,
+      });
+      if (res.data.success) {
+        if (res.data.otp_sent) {
+          setEmail(res.data.email);
+          setOtp(""); // Clear any old otp
+          setShowOtpField(true);
+        } else {
+          // Fallback just in case
+          onLogin(res.data.user, res.data.stored_data);
+        }
+      } else {
+        setError("Verification failed: " + (res.data.error || "Unknown error"));
+      }
+    } catch (err) {
+      setError("Server error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendOtp = async () => {
+    if (!email) { setError("Please enter an email"); return; }
+    setLoading(true);
+    setError("");
+    try {
+      // Updated to match clinical production endpoint
+      const res = await axios.post("http://localhost:8000/request-otp", { email });
+      if (res.data.message.includes("successfully")) {
+        setShowOtpField(true);
+      } else {
+        setError(res.data.detail || "Failed to send code");
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (!otp) { setError("Please enter the OTP"); return; }
+    setLoading(true);
+    setError("");
+    try {
+      // Updated to match clinical production endpoint
+      const res = await axios.post("http://localhost:8000/verify-otp", { email, otp });
+      if (res.data.success) {
+        // We received JWT and clinical data
+        onLogin(res.data.user, res.data.stored_data);
+      } else {
+        setError(res.data.detail || "Invalid code");
+      }
+    } catch (err) {
+      setError(err.response?.data?.detail || err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#060D1F", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif", padding: "2rem" }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap');
+        .grid-bg { position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(56,189,248,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,0.04) 1px,transparent 1px);background-size:50px 50px;pointer-events:none; }
+        .auth-input { width: 100%; background:rgba(15,23,42,0.8); border:1px solid rgba(56,189,248,0.2); border-radius:12px; padding:1rem; color:#F8FAFC; margin-bottom: 1rem; outline:none; transition: all 0.2s; }
+        .auth-input:focus { border-color: #38BDF8; box-shadow: 0 0 10px rgba(56,189,248,0.1); }
+        .tab-trigger { flex: 1; padding: 0.75rem; cursor: pointer; text-align: center; font-weight: 600; font-size: 0.85rem; border-radius: 8px; transition: all 0.2s; color: #64748B; }
+        .tab-trigger.active { background: rgba(56,189,248,0.1); color: #38BDF8; }
+      `}</style>
+      <div className="grid-bg" />
+      <div style={{ position: "relative", zIndex: 1, maxWidth: 450, width: "100%", textAlign: "center" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.75rem", marginBottom: "2rem" }}>
+          <div style={{ width: 64, height: 64, background: "linear-gradient(135deg,#0EA5E9,#6366F1)", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2rem" }}>⚕</div>
+          <span style={{ fontSize: "2.5rem", fontWeight: 800, fontFamily: "'Syne',sans-serif", color: "#F8FAFC", letterSpacing: "-1px" }}>CarePulse<span style={{ color: "#38BDF8" }}>++</span></span>
+        </div>
+
+        <div style={{ background: "rgba(15,23,42,0.8)", border: "1px solid rgba(56,189,248,0.15)", borderRadius: 24, padding: "3rem 2rem", backdropFilter: "blur(12px)", boxShadow: "0 20px 50px rgba(0,0,0,0.5)" }}>
+          <div style={{ display: "flex", background: "rgba(0,0,0,0.2)", padding: "4px", borderRadius: 12, marginBottom: "2rem" }}>
+            <div className={`tab-trigger ${view === "login" ? "active" : ""}`} onClick={() => { setView("login"); setShowOtpField(false); setError(""); }}>Login</div>
+            <div className={`tab-trigger ${view === "signup" ? "active" : ""}`} onClick={() => { setView("signup"); setShowOtpField(false); setError(""); }}>Sign Up</div>
+          </div>
+
+          <h2 style={{ color: "#F1F5F9", margin: "0 0 0.5rem", fontFamily: "'Syne',sans-serif", fontSize: "1.5rem" }}>{showOtpField ? "Verify OTP" : view === "login" ? "Welcome Back" : "Create Account"}</h2>
+          <p style={{ color: "#94A3B8", fontSize: "0.9rem", marginBottom: "2rem" }}>{showOtpField ? `Enter code sent to ${email}` : view === "login" ? "Sign in to access your records" : "Join the healthcare intelligence era"}</p>
+
+          {!showOtpField ? (
+            <>
+              <div style={{ display: "flex", justifyContent: "center" }}>
+                <GoogleLogin
+                  onSuccess={handleLoginSuccess}
+                  onError={() => setError("Google Auth Failed")}
+                  useOneTap
+                  theme="filled_blue"
+                  shape="pill"
+                  text={view === "login" ? "signin_with" : "signup_with"}
+                />
+              </div>
+
+              <div className="divider" style={{ display: "flex", alignItems: "center", color: "#475569", fontSize: "0.75rem", margin: "1.5rem 0", textTransform: "uppercase", letterSpacing: "1px" }}>
+                <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 1rem" }}></div>
+                or use email otp
+                <div style={{ flex: 1, height: "1px", background: "rgba(255,255,255,0.05)", margin: "0 1rem" }}></div>
+              </div>
+
+              <div style={{ textAlign: "left" }}>
+                <div style={{ color: "#64748B", fontSize: "0.8rem", marginBottom: "0.5rem", fontWeight: 500 }}>Email Address</div>
+                <input type="email" className="auth-input" placeholder="name@company.com" value={email} onChange={e => setEmail(e.target.value)} />
+                <button className="btn-primary" style={{ width: "100%", height: "3.5rem", fontSize: "1rem", borderRadius: "14px" }} onClick={handleSendOtp} disabled={loading}>
+                  {loading ? "Requesting OTP..." : view === "login" ? "Login with OTP →" : "Create Account with OTP →"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ background: "rgba(56,189,248,0.1)", color: "#38BDF8", padding: "0.75rem", borderRadius: "12px", fontSize: "0.85rem", marginBottom: "2rem", border: "1px solid rgba(56,189,248,0.2)" }}>
+                We've sent a 6-digit code to <br /><strong>{email}</strong>
+              </div>
+
+              <div style={{ marginBottom: "2rem" }}>
+                <input
+                  type="text"
+                  className="auth-input"
+                  placeholder="000000"
+                  value={otp}
+                  onChange={e => setOtp(e.target.value)}
+                  maxLength={6}
+                  autoFocus
+                  style={{ textAlign: "center", fontSize: "2.5rem", letterSpacing: "8px", fontWeight: 800, background: "rgba(15,23,42,0.9)", color: "#38BDF8", border: "2px solid #38BDF8", outline: "none" }}
+                />
+              </div>
+
+              <button className="btn-primary" style={{ width: "100%", height: "3.5rem", fontSize: "1rem", borderRadius: "14px" }} onClick={handleVerifyOtp} disabled={loading}>
+                {loading ? "Verifying..." : "Complete Verification →"}
+              </button>
+
+              <div style={{ marginTop: "1.5rem", display: "flex", justifyContent: "space-between", fontSize: "0.8rem" }}>
+                <button style={{ background: "none", border: "none", color: "#64748B", cursor: "pointer" }} onClick={() => setShowOtpField(false)}>
+                  ← Edit Email
+                </button>
+                <button style={{ background: "none", border: "none", color: "#38BDF8", cursor: "pointer", fontWeight: 600 }} onClick={handleSendOtp}>
+                  Resend Code
+                </button>
+              </div>
+            </div>
+          )}
+
+          {loading && <p style={{ color: "#38BDF8", marginTop: "1.5rem", animation: "pulse 2s infinite" }}>Verifying Identity...</p>}
+          {error && <p style={{ color: "#FCA5A5", marginTop: "1.5rem", fontSize: "0.85rem", background: "rgba(239,68,68,0.1)", padding: "0.75rem", borderRadius: 8 }}>{error}</p>}
+        </div>
+
+        <p style={{ color: "#475569", fontSize: "0.8rem", marginTop: "2rem" }}>Deterministic · Secure · Clinical Precision</p>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
    MINI COMPONENTS
 ═══════════════════════════════════════════════════════════════ */
 const SevBadge = ({ sev }) => (
@@ -316,6 +491,7 @@ const KpiCard = ({ icon, label, value, sub, color = "#38BDF8", glow }) => (
    MAIN DASHBOARD
 ═══════════════════════════════════════════════════════════════ */
 export default function App() {
+  const [user, setUser] = useState(null);
   const [data, setData] = useState(null);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [search, setSearch] = useState("");
@@ -397,7 +573,20 @@ export default function App() {
   const hsiColor = hm.hsi >= 0.9 ? "#E53E3E" : hm.hsi >= 0.75 ? "#DD6B20" : "#38A169";
   const erColor = hm.erLoad >= 0.85 ? "#E53E3E" : hm.erLoad >= 0.6 ? "#DD6B20" : "#38A169";
 
-  if (!data) return <UploadScreen onLoad={setData} />;
+  if (!user) return <LoginScreen onLogin={(u, d) => { setUser(u); if (d) setData(d); }} />;
+  if (!data) return <UploadScreen onLoad={async (newData) => {
+    setData(newData);
+    // Persist to server
+    try {
+      await axios.post("http://localhost:8000/api/v1/user/save_data", {
+        email: user.email,
+        patients: newData.patients,
+        hospital: newData.hospital
+      });
+    } catch (e) {
+      console.error("Failed to save data:", e);
+    }
+  }} />;
 
   return (
     <div style={{ minHeight: "100vh", background: "#060D1F", fontFamily: "'DM Sans',sans-serif", color: "#E2E8F0" }}>
@@ -445,7 +634,14 @@ export default function App() {
               </button>
             ))}
           </nav>
-          <button className="reset-btn" onClick={() => setData(null)}>↩ New Data</button>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div style={{ textAlign: "right", display: "none" }}>
+              <div style={{ color: "#F8FAFC", fontSize: "0.85rem", fontWeight: 600 }}>{user?.name}</div>
+              <div style={{ color: "#64748B", fontSize: "0.7rem" }}>{user?.email}</div>
+            </div>
+            {user?.picture && <img src={user.picture} style={{ width: 32, height: 32, borderRadius: "50%", border: "2px solid #38BDF8" }} alt="profile" />}
+            <button className="reset-btn" onClick={() => { setData(null); setUser(null); }}>Logout</button>
+          </div>
         </div>
       </div>
 
