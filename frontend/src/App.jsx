@@ -50,7 +50,7 @@ function hgbRisk(h, gender) {
 }
 function hydDef(h) { return clamp(Math.max(0, 60 - h) / 60); }
 
-function computeRisk(p) {
+function computeRisk(p, isSurgeMode, isOxygenCrisis) {
   const comps = {
     hr: hrDev(p.heart_rate_bpm),
     bp: bpDev(p.systolic_bp_mmHg, p.diastolic_bp_mmHg),
@@ -64,8 +64,20 @@ function computeRisk(p) {
     hydration: hydDef(p.hydration_level_percent),
   };
   let score = Object.entries(WEIGHTS).reduce((s, [k, w]) => s + w * comps[k], 0) * 100;
+
   if (p.chronic_disease_flag === 1) score *= 1.2;
   if (p.emergency_case_flag === 1) score += 10;
+
+  // 1. SURGE MODE: Risk Multiplier
+  if (isSurgeMode && p.surge_flag) {
+    score *= 1.2; // 20% Surge Factor
+  }
+
+  // 2. OXYGEN CRISIS: Risk Amplifier for Critical Patients
+  if (isOxygenCrisis && (score >= 70 || p.icu_required_flag === 1)) {
+    score *= 1.25;
+  }
+
   if (p.icu_required_flag === 1) score = Math.max(score, 75);
   score = Math.round(clamp(score, 0, 100) * 100) / 100;
   return { score, comps };
@@ -91,10 +103,17 @@ function roomTemp(sev, bodyTemp) {
   return bodyTemp > 39 ? base - 2 : base;
 }
 
-function computeHospital(hosp, critCount) {
-  const { total_beds: tb, occupied_beds: ob, icu_beds_total: icu, icu_beds_occupied: ocu,
-    er_capacity: erc, er_occupied: ero, ongoing_operations_count: ops,
-    available_doctors: doc, ventilators_available: ven } = hosp;
+function computeHospital(hosp, critCount, isOxygenCrisis) {
+  const tb = hosp.total_beds;
+  const ob = hosp.occupied_beds;
+  const icu = hosp.icu_beds_total;
+  const ocu = hosp.icu_beds_occupied;
+  const erc = hosp.er_capacity;
+  const ero = hosp.er_occupied;
+  const ops = hosp.ongoing_operations_count;
+  const doc = hosp.available_doctors;
+  const ven = hosp.ventilators_available;
+
   const bedRatio = (tb - ob) / tb;
   const icuRatio = (icu - ocu) / icu;
   const erLoad = ero / erc;
@@ -103,34 +122,63 @@ function computeHospital(hosp, critCount) {
   const hsi = Math.round((0.28 * (1 - bedRatio) + 0.28 * (1 - icuRatio) + 0.24 * erLoad + 0.12 * Math.min(1, opLoad) + 0.08 * Math.min(1, ventPres / 2)) * 10000) / 10000;
   const stressStatus = hsi >= 0.9 ? "Emergency Escalation" : hsi >= 0.75 ? "Capacity Warning" : "Normal Operations";
   const erStatus = hsi > 0.9 ? "TEMPORARY ER FREEZE" : erLoad >= 0.85 ? "REDIRECT to Nearby Hospital" : "ER OPEN — Admitting";
+
+  // 3. OXYGEN CRISIS: Drop supply level
+  const oxygenSupply = isOxygenCrisis ? 35 : hosp.oxygen_supply_level_percent;
+
   return {
     bedRatio, icuRatio, erLoad, opLoad, ventPres, hsi, stressStatus, erStatus,
     availIcu: icu - ocu, availGen: tb - ob, tb, icu, ven,
-    oxygen: hosp.oxygen_supply_level_percent, ambientTemp: hosp.room_temperature_celsius,
+    oxygen: oxygenSupply, ambientTemp: hosp.room_temperature_celsius,
     ambulances: hosp.ambulance_available_count, nurses: hosp.available_nurses,
     doctors: hosp.available_doctors
   };
 }
 
-function allocateBeds(patients, hm) {
+function allocateBeds(patients, hm, isOxygenCrisis) {
   let icuLeft = hm.availIcu, genLeft = hm.availGen;
   const bedAvailRatio = hm.availGen / hm.tb;
+
+  // Sort primarily by risk score
   const sorted = [...patients].sort((a, b) => {
     if (b.risk_score !== a.risk_score) return b.risk_score - a.risk_score;
     return b.emergency_case_flag - a.emergency_case_flag;
   });
+
   const alloc = {};
+
+  // 4. OXYGEN CRISIS: Ventilator Triage Logic
+  let availableVents = hm.ven;
+
   for (const p of sorted) {
     const sev = p.severity;
     let bed, alert = "";
+
     if (sev === "Critical") {
-      if (icuLeft > 0) { bed = "ICU"; icuLeft--; } else { bed = "ICU — ESCALATION ALERT"; alert = "ICU FULL"; }
+      if (icuLeft > 0) {
+        bed = "ICU";
+        icuLeft--;
+
+        // Vent assignment logic if in Oxygen crisis
+        if (isOxygenCrisis) {
+          if (availableVents > 0) {
+            bed = "ICU - Vent Allocated";
+            availableVents--;
+          } else {
+            bed = "ICU - NO VENT AVAILABLE (Triage)";
+            alert = "OXYGEN TRIAGE";
+          }
+        }
+      } else {
+        bed = "ICU — ESCALATION ALERT";
+        alert = "ICU FULL";
+      }
     } else if (sev === "Moderate") {
       if (bedAvailRatio < 0.1) { bed = "HOLD — Stop Admissions"; alert = "BED CRITICAL <10%"; }
       else if (genLeft > 0) { bed = "General Bed"; genLeft--; }
       else { bed = "Overflow"; alert = "NO BEDS"; }
     } else { bed = "Observation Ward"; }
-    alloc[p.patient_id] = { bed, alert };
+    alloc[p.patient_id] = { bed, alert, surge: p.surge_flag === 1 };
   }
   return alloc;
 }
@@ -141,9 +189,23 @@ function erDecision(erLoad, hsi, isEmergency) {
   return isEmergency ? "ADMITTED — Emergency Priority" : "ADMITTED — ER Available";
 }
 
-function processData(patientRows, hospRow) {
+function processData(patientRows, hospRow, isSurgeMode = false, isOxygenCrisis = false) {
+  // 5. SURGE MODE: Flag 15% of patients
+  let surgeIndices = new Set();
+  if (isSurgeMode && patientRows.length > 0) {
+    const count = Math.ceil(patientRows.length * 0.15);
+    // Deterministic random selection based on ID hash for demo consistency
+    const sortedIds = [...patientRows].sort((a, b) => String(a.patient_id).localeCompare(String(b.patient_id)));
+    for (let i = 0; i < count; i++) {
+      // Just pick every Nth patient for uniform artificial load
+      surgeIndices.add(sortedIds[(i * 7) % sortedIds.length].patient_id);
+    }
+  }
+
   const patients = patientRows.map(p => {
     // Normalizing parsed keys strictly to match UI expectations if they omit them
+    const isSurgePatient = surgeIndices.has(p.patient_id);
+
     const norm = {
       patient_id: p.patient_id,
       age: p.age || 50,
@@ -159,13 +221,14 @@ function processData(patientRows, hospRow) {
       hemoglobin_g_dl: p.hemoglobin_g_dl || p.hemoglobin || 14.0,
       hydration_level_percent: p.hydration_level_percent || p.hydration_level || 98.0,
       chronic_disease_flag: p.chronic_disease_flag || 0,
-      emergency_case_flag: p.emergency_case_flag || 0,
+      emergency_case_flag: isSurgePatient ? 1 : (p.emergency_case_flag || 0),
       icu_required_flag: p.icu_required_flag || 0,
+      surge_flag: isSurgePatient ? 1 : 0,
       admission_type: p.admission_type || "Unknown",
       diagnosis_category: p.diagnosis_category || "Unknown"
     };
 
-    const { score, comps } = computeRisk(norm);
+    const { score, comps } = computeRisk(norm, isSurgeMode, isOxygenCrisis);
     const sev = severity(score);
     return {
       ...norm,
@@ -176,16 +239,19 @@ function processData(patientRows, hospRow) {
       comps,
     };
   });
+
   const critCount = patients.filter(p => p.severity === "Critical").length;
-  const hm = computeHospital(hospRow, critCount);
-  const bedMap = allocateBeds(patients, hm);
+  const hm = computeHospital(hospRow, critCount, isOxygenCrisis);
+  const bedMap = allocateBeds(patients, hm, isOxygenCrisis);
+
   const final = patients.map(p => ({
     ...p,
     bed_allocation: bedMap[p.patient_id]?.bed || "Unknown",
     bed_alert: bedMap[p.patient_id]?.alert || "",
+    is_surge_patient: bedMap[p.patient_id]?.surge || false,
     er_decision: erDecision(hm.erLoad, hm.hsi, p.emergency_case_flag === 1),
   }));
-  return { patients: final, hospital: hm };
+  return { patients: final, hospital: hm, rawPatients: patientRows, rawHospital: hospRow };
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -542,6 +608,18 @@ export default function App() {
   const [isAddPatientOpen, setIsAddPatientOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Crisis Mode States
+  const [isSurgeMode, setIsSurgeMode] = useState(false);
+  const [isOxygenCrisis, setIsOxygenCrisis] = useState(false);
+
+  // Data recalculation effect for Crisis Modes
+  useEffect(() => {
+    if (data?.rawPatients && data?.rawHospital) {
+      const reprocessed = processData(data.rawPatients, data.rawHospital, isSurgeMode, isOxygenCrisis);
+      setData(prev => ({ ...prev, patients: reprocessed.patients, hospital: reprocessed.hospital }));
+    }
+  }, [isSurgeMode, isOxygenCrisis]);
+
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -607,6 +685,7 @@ export default function App() {
     { id: "risk", label: "Risk Analysis", icon: "⚠️" },
     { id: "hospital", label: "Hospital", icon: "🏥" },
     { id: "er", label: "ER Tracker", icon: "🚨" },
+    { id: "command", label: "Command Center", icon: "🗺️" },
   ];
 
   const DIET_COLORS = ["#0EA5E9", "#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
@@ -796,9 +875,28 @@ export default function App() {
         {/* ══════════════ DASHBOARD TAB ══════════════ */}
         {activeTab === "dashboard" && (
           <div className="fade-in">
-            <div style={{ marginBottom: "1.5rem" }}>
-              <h2 style={{ margin: 0, fontFamily: "'Syne',sans-serif", fontSize: "1.4rem", color: "#F8FAFC" }}>Hospital Intelligence Overview</h2>
-              <p style={{ margin: "0.25rem 0 0", color: "#475569", fontSize: "0.85rem" }}>Real-time deterministic analysis · {patients.length} patients processed</p>
+            <div style={{ marginBottom: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
+              <div>
+                <h2 style={{ margin: 0, fontFamily: "'Syne',sans-serif", fontSize: "1.4rem", color: "#F8FAFC" }}>Hospital Intelligence Overview</h2>
+                <p style={{ margin: "0.25rem 0 0", color: "#475569", fontSize: "0.85rem" }}>Real-time deterministic analysis · {patients.length} patients processed</p>
+              </div>
+
+              {/* Crisis Control Panel */}
+              <div style={{ background: "rgba(15,23,42,0.8)", border: "1px solid rgba(56,189,248,0.2)", borderRadius: 12, padding: "0.5rem 1rem", display: "flex", gap: "1rem", alignItems: "center" }}>
+                <span style={{ color: "#94A3B8", fontSize: "0.8rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Crisis Simulations</span>
+
+                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                  <input type="checkbox" checked={isSurgeMode} onChange={e => setIsSurgeMode(e.target.checked)} style={{ accentColor: "#F59E0B", width: 16, height: 16 }} />
+                  <span style={{ color: isSurgeMode ? "#FBBF24" : "#94A3B8", fontSize: "0.85rem", fontWeight: 600 }}>Surge Mode (15%)</span>
+                </label>
+
+                <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }}></div>
+
+                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                  <input type="checkbox" checked={isOxygenCrisis} onChange={e => setIsOxygenCrisis(e.target.checked)} style={{ accentColor: "#E53E3E", width: 16, height: 16 }} />
+                  <span style={{ color: isOxygenCrisis ? "#F87171" : "#94A3B8", fontSize: "0.85rem", fontWeight: 600 }}>O2 Crisis (&lt;40%)</span>
+                </label>
+              </div>
             </div>
 
             {/* KPIs row 1 */}
@@ -1209,6 +1307,65 @@ export default function App() {
                 </table>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ══════════════ COMMAND CENTER TAB (HEATMAP) ══════════════ */}
+        {activeTab === "command" && (
+          <div className="fade-in">
+            <div style={{ marginBottom: "1.25rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
+              <div>
+                <h2 style={{ margin: 0, fontFamily: "'Syne',sans-serif", fontSize: "1.4rem", color: "#F8FAFC" }}>Clinical Command Center</h2>
+                <p style={{ margin: "0.25rem 0 0", color: "#475569", fontSize: "0.85rem" }}>Spatial Severity Heatmap · Select patient node for detailed intervention</p>
+              </div>
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                <span style={{ fontSize: "0.8rem", color: "#94A3B8" }}>Legend:</span>
+                <span style={{ background: "#E53E3E", width: 12, height: 12, borderRadius: 3 }}></span><span style={{ fontSize: "0.75rem", color: "#CBD5E1" }}>Critical</span>
+                <span style={{ background: "#DD6B20", width: 12, height: 12, borderRadius: 3, marginLeft: "0.5rem" }}></span><span style={{ fontSize: "0.75rem", color: "#CBD5E1" }}>Moderate</span>
+                <span style={{ background: "#38A169", width: 12, height: 12, borderRadius: 3, marginLeft: "0.5rem" }}></span><span style={{ fontSize: "0.75rem", color: "#CBD5E1" }}>Stable</span>
+              </div>
+            </div>
+
+            <div style={{ background: "rgba(15,23,42,0.7)", border: "1px solid rgba(56,189,248,0.15)", borderRadius: 16, padding: "1.5rem", minHeight: 400 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(60px, 1fr))", gap: "10px" }}>
+                {patients.map(p => {
+                  let bgColor = p.severity === "Critical" ? `rgba(229, 62, 62, ${p.risk_score / 100})` :
+                    p.severity === "Moderate" ? `rgba(221, 107, 32, ${(p.risk_score / 100) + 0.2})` :
+                      `rgba(56, 161, 105, 0.4)`;
+                  let pulseClass = p.severity === "Critical" && p.risk_score > 85 ? "pulse" : "";
+                  // Give surge patients an orange border, and triaged criticals a red dashed border
+                  let borderStyle = p.is_surge_patient ? "2px solid #F59E0B" :
+                    p.bed_allocation.includes("TRIAGE") ? "2px dashed #E53E3E" :
+                      `1px solid rgba(255,255,255,0.1)`;
+
+                  return (
+                    <div
+                      key={p.patient_id}
+                      className={pulseClass}
+                      onClick={() => setSelectedPatient(p)}
+                      title={`ID: ${p.patient_id} | Risk: ${p.risk_score} | ${p.severity}`}
+                      style={{
+                        aspectRatio: "1/1",
+                        background: bgColor,
+                        borderRadius: "8px",
+                        border: borderStyle,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        boxShadow: "0 4px 6px rgba(0,0,0,0.1)"
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.zIndex = 10; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.zIndex = 1; }}
+                    >
+                      <span style={{ color: "#fff", fontSize: "0.65rem", fontWeight: "bold", textShadow: "0 1px 2px rgba(0,0,0,0.8)" }}>{p.patient_id}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {patients.length === 0 && <p style={{ textAlign: "center", color: "#64748B", marginTop: "2rem" }}>No patients in unit.</p>}
           </div>
         )}
       </div>
