@@ -17,6 +17,7 @@ import time
 import aiosmtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import pandas as pd
 
 load_dotenv()
 
@@ -219,25 +220,74 @@ async def save_user_data(data: UserDataStore):
         return {"success": False, "error": str(e)}
 
 @app.post("/api/v1/patient/analyze", response_model=PatientAnalysisResult)
-async def analyze_patient(patient: PatientData):
+async def analyze_patient(patient: PatientData, is_oxygen_crisis: bool = False):
     """
     Computes mathematical risk score and classifications for a single patient in O(1) time.
     """
-    return calculate_patient_risk(patient)
+    return calculate_patient_risk(patient, is_oxygen_crisis)
 
 @app.post("/api/v1/patient/analyze_bulk", response_model=List[PatientAnalysisResult])
-async def analyze_patient_bulk(patients: List[PatientData]):
+async def analyze_patient_bulk(patients: List[PatientData], is_oxygen_crisis: bool = False):
     """
     Computes mathematical risk scores for a list of patients in O(n) time.
     """
-    return [calculate_patient_risk(p) for p in patients]
+    return [calculate_patient_risk(p, is_oxygen_crisis) for p in patients]
 
 @app.post("/api/v1/hospital/stress", response_model=HospitalAnalysisResult)
-async def check_hospital_stress(hospital: HospitalData):
+async def check_hospital_stress(hospital: HospitalData, critical_patients_count: int = 0):
     """
     Computes Hospital Stress Index (HSI) and bed routing actions mathematically.
     """
-    return calculate_hospital_stress(hospital)
+    return calculate_hospital_stress(hospital, critical_patients_count)
+
+@app.post("/api/v1/patients/add")
+async def add_patient(req: dict):
+    """
+    Adds a new patient to global Excel.
+    The frontend will then update its local state and call save_data to persist in JSON.
+    """
+    patient = req.get("patient")
+    if not patient:
+        raise HTTPException(status_code=400, detail="Missing patient data")
+
+    EXCEL_FILE = "Patient_Clinical_Data.xlsx"
+    new_id = 1
+    if os.path.exists(EXCEL_FILE):
+        try:
+            df = pd.read_excel(EXCEL_FILE)
+            if not df.empty and 'patient_id' in df.columns:
+                # Filter out non-numeric IDs if any, then find max
+                numeric_ids = pd.to_numeric(df['patient_id'], errors='coerce')
+                if not numeric_ids.isna().all():
+                    new_id = int(numeric_ids.max()) + 1
+                else:
+                    new_id = len(df) + 1
+        except Exception as e:
+            print(f"ID Gen Error: {e}")
+            new_id = random.randint(10000, 99999) # Fallback
+    
+    patient["patient_id"] = str(new_id)
+
+    # 2. Update Excel
+    try:
+        if os.path.exists(EXCEL_FILE):
+            df = pd.read_excel(EXCEL_FILE)
+            new_row_df = pd.DataFrame([patient])
+            # Ensure columns match
+            for col in df.columns:
+                if col not in new_row_df.columns:
+                    new_row_df[col] = None
+            # Reorder columns to match
+            new_row_df = new_row_df[df.columns]
+            df = pd.concat([df, new_row_df], ignore_index=True)
+            df.to_excel(EXCEL_FILE, index=False)
+        else:
+             pd.DataFrame([patient]).to_excel(EXCEL_FILE, index=False)
+    except Exception as e:
+        print(f"Excel Update Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update Excel: {str(e)}")
+
+    return {"success": True, "patient": patient}
 
 if __name__ == "__main__":
     import uvicorn

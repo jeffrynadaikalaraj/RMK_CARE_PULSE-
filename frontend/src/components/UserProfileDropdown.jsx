@@ -73,7 +73,7 @@ const UserProfileDropdown = ({ user, onLogout, onViewProfile, onViewTab }) => {
           width: 10px;
           height: 10px;
           border-radius: 50%;
-          border: 2px solid #060D1F;
+          border: 2px solid #120516;
           position: absolute;
           bottom: -1px;
           right: -1px;

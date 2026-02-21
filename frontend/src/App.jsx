@@ -139,11 +139,20 @@ function allocateBeds(patients, hm, isOxygenCrisis) {
   let icuLeft = hm.availIcu, genLeft = hm.availGen;
   const bedAvailRatio = hm.availGen / hm.tb;
 
-  // Sort primarily by risk score
-  const sorted = [...patients].sort((a, b) => {
+  // First pass: identify how many ventilators we have and sort criticals separately
+  const criticals = patients.filter(p => severity(p.risk_score) === "Critical");
+  const others = patients.filter(p => severity(p.risk_score) !== "Critical");
+
+  // Sort criticals: absolute highest risk score first (for Top-K Vent allocation)
+  criticals.sort((a, b) => b.risk_score - a.risk_score);
+
+  // Sort others: standard priority
+  others.sort((a, b) => {
     if (b.risk_score !== a.risk_score) return b.risk_score - a.risk_score;
     return b.emergency_case_flag - a.emergency_case_flag;
   });
+
+  const sorted = [...criticals, ...others];
 
   const alloc = {};
 
@@ -156,7 +165,6 @@ function allocateBeds(patients, hm, isOxygenCrisis) {
 
     if (sev === "Critical") {
       if (icuLeft > 0) {
-        bed = "ICU";
         icuLeft--;
 
         // Vent assignment logic if in Oxygen crisis
@@ -168,6 +176,8 @@ function allocateBeds(patients, hm, isOxygenCrisis) {
             bed = "ICU - NO VENT AVAILABLE (Triage)";
             alert = "OXYGEN TRIAGE";
           }
+        } else {
+          bed = "ICU"; // Standard ICU allocation when no crisis
         }
       } else {
         bed = "ICU — ESCALATION ALERT";
@@ -301,33 +311,33 @@ function UploadScreen({ onLoad }) {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#060D1F", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif", padding: "2rem" }}>
+    <div style={{ minHeight: "100vh", background: "#120516", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif", padding: "2rem" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap');
         * { box-sizing: border-box; }
         body { margin: 0; }
-        .upload-zone { border: 2px dashed rgba(56,189,248,0.3); border-radius:16px; padding:2rem; text-align:center; cursor:pointer; transition:all 0.2s; background:rgba(56,189,248,0.03); }
-        .upload-zone:hover { border-color:rgba(56,189,248,0.7); background:rgba(56,189,248,0.07); }
-        .upload-zone.has-file { border-color:#38BDF8; background:rgba(56,189,248,0.1); }
-        .btn-primary { background:linear-gradient(135deg,#0EA5E9,#6366F1); color:#fff; border:none; padding:1rem 2.5rem; border-radius:12px; font-size:1rem; font-weight:600; cursor:pointer; transition:all 0.2s; font-family:inherit; }
+        .upload-zone { border: 2px dashed rgba(232,121,249,0.3); border-radius:16px; padding:2rem; text-align:center; cursor:pointer; transition:all 0.2s; background:rgba(232,121,249,0.03); }
+        .upload-zone:hover { border-color:rgba(232,121,249,0.7); background:rgba(232,121,249,0.07); }
+        .upload-zone.has-file { border-color:#E879F9; background:rgba(232,121,249,0.1); }
+        .btn-primary { background:linear-gradient(135deg,#D946EF,#8B5CF6); color:#fff; border:none; padding:1rem 2.5rem; border-radius:12px; font-size:1rem; font-weight:600; cursor:pointer; transition:all 0.2s; font-family:inherit; }
         .btn-primary:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 8px 24px rgba(99,102,241,0.4); }
         .btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
         .pulse { animation: pulse 2s infinite; }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-        .grid-bg { position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(56,189,248,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,0.04) 1px,transparent 1px);background-size:50px 50px;pointer-events:none; }
+        .grid-bg { position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(232,121,249,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,121,249,0.04) 1px,transparent 1px);background-size:50px 50px;pointer-events:none; }
         input[type=file] { display:none; }
       `}</style>
       <div className="grid-bg" />
       <div style={{ position: "relative", zIndex: 1, maxWidth: 600, width: "100%" }}>
         <div style={{ textAlign: "center", marginBottom: "3rem" }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
-            <div style={{ width: 48, height: 48, background: "linear-gradient(135deg,#0EA5E9,#6366F1)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.5rem" }}>⚕</div>
+            <div style={{ width: 48, height: 48, background: "linear-gradient(135deg,#D946EF,#8B5CF6)", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.5rem" }}>⚕</div>
             <span style={{ fontSize: "1.8rem", fontWeight: 800, fontFamily: "'Syne',sans-serif", color: "#F8FAFC", letterSpacing: "-0.5px" }}>CarePulse++</span>
           </div>
-          <p style={{ color: "#94A3B8", fontSize: "1rem", margin: 0, lineHeight: 1.6 }}>Smart Patient Monitoring &amp; Hospital Resource Optimization<br /><span style={{ color: "#38BDF8", fontSize: "0.85rem" }}>Fully Deterministic · Rule-Based · O(n) Complexity</span></p>
+          <p style={{ color: "#94A3B8", fontSize: "1rem", margin: 0, lineHeight: 1.6 }}>Smart Patient Monitoring &amp; Hospital Resource Optimization<br /><span style={{ color: "#E879F9", fontSize: "0.85rem" }}>Fully Deterministic · Rule-Based · O(n) Complexity</span></p>
         </div>
 
-        <div style={{ background: "rgba(15,23,42,0.8)", border: "1px solid rgba(56,189,248,0.15)", borderRadius: 20, padding: "2.5rem", backdropFilter: "blur(10px)" }}>
+        <div style={{ background: "rgba(28,15,35,0.8)", border: "1px solid rgba(232,121,249,0.15)", borderRadius: 20, padding: "2.5rem", backdropFilter: "blur(10px)" }}>
           <h3 style={{ color: "#F1F5F9", margin: "0 0 1.5rem", fontFamily: "'Syne',sans-serif", fontSize: "1.1rem" }}>Upload Data Files</h3>
 
           {[{ label: "Patient Clinical Data", key: "pat", file: patFile, set: setPatFile }, { label: "Hospital Resource Status", key: "hos", file: hosFile, set: setHosFile }].map(({ label, file, set }) => (
@@ -335,7 +345,7 @@ function UploadScreen({ onLoad }) {
               <input type="file" accept=".xlsx,.xls" onChange={e => set(e.target.files[0])} />
               <div className={`upload-zone ${file ? "has-file" : ""}`}>
                 <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>{file ? "✅" : "📂"}</div>
-                <div style={{ color: file ? "#38BDF8" : "#64748B", fontWeight: 600, fontSize: "0.9rem" }}>{file ? file.name : label}</div>
+                <div style={{ color: file ? "#E879F9" : "#64748B", fontWeight: 600, fontSize: "0.9rem" }}>{file ? file.name : label}</div>
                 <div style={{ color: "#475569", fontSize: "0.8rem", marginTop: "0.25rem" }}>{file ? "Click to change" : "Click to upload .xlsx"}</div>
               </div>
             </label>
@@ -400,11 +410,11 @@ function LoginScreen({ onLogin }) {
     setError("");
     try {
       // Updated to match clinical production endpoint
-      const res = await axios.post("http://localhost:8000/request-otp", { email });
-      if (res.data.message.includes("successfully")) {
+      const res = await axios.post("http://localhost:8000/api/v1/auth/otp/send", { email });
+      if (res.data.success) {
         setShowOtpField(true);
       } else {
-        setError(res.data.detail || "Failed to send code");
+        setError(res.data.error || res.data.detail || "Failed to send code");
       }
     } catch (err) {
       setError(err.response?.data?.detail || err.message);
@@ -433,12 +443,12 @@ function LoginScreen({ onLogin }) {
     setLoading(true);
     setError("");
     try {
-      const res = await axios.post("http://localhost:8000/verify-otp", { email, otp });
+      const res = await axios.post("http://localhost:8000/api/v1/auth/otp/verify", { email, otp });
       if (res.data.success) {
         onLogin(res.data.user, res.data.stored_data);
         localStorage.setItem("token", res.data.access_token);
       } else {
-        setError(res.data.detail || "Invalid code");
+        setError(res.data.error || res.data.detail || "Invalid code");
       }
     } catch (err) {
       setError(err.response?.data?.detail || err.message);
@@ -449,23 +459,23 @@ function LoginScreen({ onLogin }) {
 
 
   return (
-    <div style={{ minHeight: "100vh", background: "#060D1F", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif", padding: "2rem" }}>
+    <div style={{ minHeight: "100vh", background: "#120516", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'DM Sans', sans-serif", padding: "2rem" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap');
-        .grid-bg { position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(56,189,248,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,0.04) 1px,transparent 1px);background-size:50px 50px;pointer-events:none; }
-        .auth-input { width: 100%; background:rgba(15,23,42,0.8); border:1px solid rgba(56,189,248,0.2); border-radius:12px; padding:1rem; color:#F8FAFC; margin-bottom: 1rem; outline:none; transition: all 0.2s; }
-        .auth-input:focus { border-color: #38BDF8; box-shadow: 0 0 10px rgba(56,189,248,0.1); }
+        .grid-bg { position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(232,121,249,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(232,121,249,0.04) 1px,transparent 1px);background-size:50px 50px;pointer-events:none; }
+        .auth-input { width: 100%; background:rgba(28,15,35,0.8); border:1px solid rgba(232,121,249,0.2); border-radius:12px; padding:1rem; color:#F8FAFC; margin-bottom: 1rem; outline:none; transition: all 0.2s; }
+        .auth-input:focus { border-color: #E879F9; box-shadow: 0 0 10px rgba(232,121,249,0.1); }
         .tab-trigger { flex: 1; padding: 0.75rem; cursor: pointer; text-align: center; font-weight: 600; font-size: 0.85rem; border-radius: 8px; transition: all 0.2s; color: #64748B; }
-        .tab-trigger.active { background: rgba(56,189,248,0.1); color: #38BDF8; }
+        .tab-trigger.active { background: rgba(232,121,249,0.1); color: #E879F9; }
       `}</style>
       <div className="grid-bg" />
       <div style={{ position: "relative", zIndex: 1, maxWidth: 450, width: "100%", textAlign: "center" }}>
         <div style={{ display: "inline-flex", alignItems: "center", gap: "0.75rem", marginBottom: "2rem" }}>
-          <div style={{ width: 64, height: 64, background: "linear-gradient(135deg,#0EA5E9,#6366F1)", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2rem" }}>⚕</div>
-          <span style={{ fontSize: "2.5rem", fontWeight: 800, fontFamily: "'Syne',sans-serif", color: "#F8FAFC", letterSpacing: "-1px" }}>CarePulse<span style={{ color: "#38BDF8" }}>++</span></span>
+          <div style={{ width: 64, height: 64, background: "linear-gradient(135deg,#D946EF,#8B5CF6)", borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2rem" }}>⚕</div>
+          <span style={{ fontSize: "2.5rem", fontWeight: 800, fontFamily: "'Syne',sans-serif", color: "#F8FAFC", letterSpacing: "-1px" }}>CarePulse<span style={{ color: "#E879F9" }}>++</span></span>
         </div>
 
-        <div style={{ background: "rgba(15,23,42,0.8)", border: "1px solid rgba(56,189,248,0.15)", borderRadius: 24, padding: "3rem 2rem", backdropFilter: "blur(12px)", boxShadow: "0 20px 50px rgba(0,0,0,0.5)" }}>
+        <div style={{ background: "rgba(28,15,35,0.8)", border: "1px solid rgba(232,121,249,0.15)", borderRadius: 24, padding: "3rem 2rem", backdropFilter: "blur(12px)", boxShadow: "0 20px 50px rgba(0,0,0,0.5)" }}>
           <div style={{ display: "flex", background: "rgba(0,0,0,0.2)", padding: "4px", borderRadius: 12, marginBottom: "2rem" }}>
             <div className={`tab-trigger ${view === "login" ? "active" : ""}`} onClick={() => { setView("login"); setShowOtpField(false); setError(""); }}>Login</div>
             <div className={`tab-trigger ${view === "signup" ? "active" : ""}`} onClick={() => { setView("signup"); setShowOtpField(false); setError(""); }}>Sign Up</div>
@@ -499,7 +509,7 @@ function LoginScreen({ onLogin }) {
 
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
                   <div style={{ color: "#64748B", fontSize: "0.8rem", fontWeight: 500 }}>Password</div>
-                  <button style={{ background: "none", border: "none", color: "#38BDF8", cursor: "pointer", fontSize: "0.75rem" }} onClick={() => setShowPasswordField(!showPasswordField)}>
+                  <button style={{ background: "none", border: "none", color: "#E879F9", cursor: "pointer", fontSize: "0.75rem" }} onClick={() => setShowPasswordField(!showPasswordField)}>
                     {showPasswordField ? "Use OTP instead" : "Use password"}
                   </button>
                 </div>
@@ -517,7 +527,7 @@ function LoginScreen({ onLogin }) {
             </>
           ) : (
             <div style={{ textAlign: "center" }}>
-              <div style={{ background: "rgba(56,189,248,0.1)", color: "#38BDF8", padding: "0.75rem", borderRadius: "12px", fontSize: "0.85rem", marginBottom: "2rem", border: "1px solid rgba(56,189,248,0.2)" }}>
+              <div style={{ background: "rgba(232,121,249,0.1)", color: "#E879F9", padding: "0.75rem", borderRadius: "12px", fontSize: "0.85rem", marginBottom: "2rem", border: "1px solid rgba(232,121,249,0.2)" }}>
                 We've sent a 6-digit code to <br /><strong>{email}</strong>
               </div>
 
@@ -530,7 +540,7 @@ function LoginScreen({ onLogin }) {
                   onChange={e => setOtp(e.target.value)}
                   maxLength={6}
                   autoFocus
-                  style={{ textAlign: "center", fontSize: "2.5rem", letterSpacing: "8px", fontWeight: 800, background: "rgba(15,23,42,0.9)", color: "#38BDF8", border: "2px solid #38BDF8", outline: "none" }}
+                  style={{ textAlign: "center", fontSize: "2.5rem", letterSpacing: "8px", fontWeight: 800, background: "rgba(28,15,35,0.9)", color: "#E879F9", border: "2px solid #E879F9", outline: "none" }}
                 />
               </div>
 
@@ -542,14 +552,14 @@ function LoginScreen({ onLogin }) {
                 <button style={{ background: "none", border: "none", color: "#64748B", cursor: "pointer" }} onClick={() => setShowOtpField(false)}>
                   ← Edit Email
                 </button>
-                <button style={{ background: "none", border: "none", color: "#38BDF8", cursor: "pointer", fontWeight: 600 }} onClick={handleSendOtp}>
+                <button style={{ background: "none", border: "none", color: "#E879F9", cursor: "pointer", fontWeight: 600 }} onClick={handleSendOtp}>
                   Resend Code
                 </button>
               </div>
             </div>
           )}
 
-          {loading && <p style={{ color: "#38BDF8", marginTop: "1.5rem", animation: "pulse 2s infinite" }}>Verifying Identity...</p>}
+          {loading && <p style={{ color: "#E879F9", marginTop: "1.5rem", animation: "pulse 2s infinite" }}>Verifying Identity...</p>}
           {error && <p style={{ color: "#FCA5A5", marginTop: "1.5rem", fontSize: "0.85rem", background: "rgba(239,68,68,0.1)", padding: "0.75rem", borderRadius: 8 }}>{error}</p>}
         </div>
 
@@ -578,8 +588,8 @@ const RiskBar = ({ score }) => {
   );
 };
 
-const KpiCard = ({ icon, label, value, sub, color = "#38BDF8", glow }) => (
-  <div style={{ background: "rgba(15,23,42,0.7)", border: `1px solid ${color}30`, borderRadius: 16, padding: "1.25rem 1.5rem", backdropFilter: "blur(8px)", boxShadow: glow ? `0 0 20px ${color}25` : undefined, flex: 1 }}>
+const KpiCard = ({ icon, label, value, sub, color = "#E879F9", glow }) => (
+  <div style={{ background: "rgba(28,15,35,0.7)", border: `1px solid ${color}30`, borderRadius: 16, padding: "1.25rem 1.5rem", backdropFilter: "blur(8px)", boxShadow: glow ? `0 0 20px ${color}25` : undefined, flex: 1 }}>
     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
       <div>
         <div style={{ color: "#64748B", fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "0.5rem" }}>{label}</div>
@@ -688,7 +698,7 @@ export default function App() {
     { id: "command", label: "Command Center", icon: "🗺️" },
   ];
 
-  const DIET_COLORS = ["#0EA5E9", "#6366F1", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
+  const DIET_COLORS = ["#D946EF", "#8B5CF6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
   const dietDist = useMemo(() => Object.entries(patients.reduce((acc, p) => { acc[p.diet] = (acc[p.diet] || 0) + 1; return acc; }, {})).map(([n, v], i) => ({ name: n.replace(" Diet", ""), value: v, color: DIET_COLORS[i % DIET_COLORS.length] })), [patients]);
 
   const sevDist = useMemo(() => [
@@ -798,7 +808,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#060D1F", fontFamily: "'DM Sans',sans-serif", color: "#E2E8F0" }}>
+    <div style={{ minHeight: "100vh", background: "#120516", fontFamily: "'DM Sans',sans-serif", color: "#E2E8F0" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap');
         * { box-sizing:border-box; }
@@ -807,21 +817,21 @@ export default function App() {
         ::-webkit-scrollbar-track{background:#0F172A}
         ::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
         .tab-btn { background:none;border:none;cursor:pointer;padding:0.6rem 1.1rem;border-radius:10px;font-family:inherit;font-size:0.85rem;font-weight:600;transition:all 0.2s;color:#64748B;display:flex;align-items:center;gap:0.4rem;white-space:nowrap; }
-        .tab-btn.active { background:rgba(14,165,233,0.15);color:#38BDF8;box-shadow:0 0 12px rgba(56,189,248,0.15); }
+        .tab-btn.active { background:rgba(14,165,233,0.15);color:#E879F9;box-shadow:0 0 12px rgba(232,121,249,0.15); }
         .tab-btn:hover:not(.active){color:#94A3B8;background:rgba(255,255,255,0.04)}
         .table-row { transition:background 0.15s;cursor:pointer; }
         .table-row:hover { background:rgba(14,165,233,0.07)!important; }
         .th-btn { background:none;border:none;cursor:pointer;color:inherit;font:inherit;padding:0;display:flex;align-items:center;gap:4px;white-space:nowrap; }
-        .search-input { background:rgba(15,23,42,0.8);border:1px solid rgba(56,189,248,0.2);border-radius:10px;padding:0.6rem 1rem;color:#F1F5F9;font-family:inherit;font-size:0.875rem;outline:none;transition:border 0.2s; }
-        .search-input:focus{border-color:#38BDF8}
-        .filter-btn{background:rgba(15,23,42,0.6);border:1px solid rgba(100,116,139,0.3);border-radius:8px;padding:0.5rem 1rem;color:#94A3B8;font-family:inherit;font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.2s}
-        .filter-btn.active{background:rgba(14,165,233,0.15);border-color:#38BDF8;color:#38BDF8}
+        .search-input { background:rgba(28,15,35,0.8);border:1px solid rgba(232,121,249,0.2);border-radius:10px;padding:0.6rem 1rem;color:#F1F5F9;font-family:inherit;font-size:0.875rem;outline:none;transition:border 0.2s; }
+        .search-input:focus{border-color:#E879F9}
+        .filter-btn{background:rgba(28,15,35,0.6);border:1px solid rgba(100,116,139,0.3);border-radius:8px;padding:0.5rem 1rem;color:#94A3B8;font-family:inherit;font-size:0.8rem;font-weight:600;cursor:pointer;transition:all 0.2s}
+        .filter-btn.active{background:rgba(14,165,233,0.15);border-color:#E879F9;color:#E879F9}
         .filter-btn:hover:not(.active){border-color:#475569;color:#CBD5E1}
-        .card{background:rgba(15,23,42,0.7);border:1px solid rgba(56,189,248,0.1);border-radius:16px;padding:1.5rem;backdropFilter:blur(8px)}
+        .card{background:rgba(28,15,35,0.7);border:1px solid rgba(232,121,249,0.1);border-radius:16px;padding:1.5rem;backdropFilter:blur(8px)}
         .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;display:flex;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)}
-        .modal{background:#0F172A;border:1px solid rgba(56,189,248,0.2);border-radius:20px;padding:2rem;max-width:720px;width:100%;max-height:90vh;overflow-y:auto}
-        .metric-pill{display:inline-flex;flex-direction:column;align-items:center;background:rgba(15,23,42,0.8);border:1px solid rgba(56,189,248,0.12);border-radius:10px;padding:0.6rem 0.9rem}
-        .grid-bg{position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(56,189,248,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,0.025) 1px,transparent 1px);background-size:50px 50px;pointer-events:none;z-index:0}
+        .modal{background:#0F172A;border:1px solid rgba(232,121,249,0.2);border-radius:20px;padding:2rem;max-width:720px;width:100%;max-height:90vh;overflow-y:auto}
+        .metric-pill{display:inline-flex;flex-direction:column;align-items:center;background:rgba(28,15,35,0.8);border:1px solid rgba(232,121,249,0.12);border-radius:10px;padding:0.6rem 0.9rem}
+        .grid-bg{position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(232,121,249,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(232,121,249,0.025) 1px,transparent 1px);background-size:50px 50px;pointer-events:none;z-index:0}
         .reset-btn{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:0.5rem 1rem;color:#FCA5A5;font-family:inherit;font-size:0.8rem;cursor:pointer;transition:all 0.2s}
         .reset-btn:hover{background:rgba(239,68,68,0.2)}
         @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
@@ -830,11 +840,11 @@ export default function App() {
       <div className="grid-bg" />
 
       {/* ── HEADER ── */}
-      <div style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(6,13,31,0.9)", backdropFilter: "blur(16px)", borderBottom: "1px solid rgba(56,189,248,0.1)" }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(6,13,31,0.9)", backdropFilter: "blur(16px)", borderBottom: "1px solid rgba(232,121,249,0.1)" }}>
         <div style={{ maxWidth: 1400, margin: "0 auto", padding: "0 1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", height: 60 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <div style={{ width: 36, height: 36, background: "linear-gradient(135deg,#0EA5E9,#6366F1)", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem" }}>⚕</div>
-            <span style={{ fontSize: "1.1rem", fontWeight: 800, fontFamily: "'Syne',sans-serif", color: "#F8FAFC", letterSpacing: "-0.3px" }}>CarePulse<span style={{ color: "#38BDF8" }}>++</span></span>
+            <div style={{ width: 36, height: 36, background: "linear-gradient(135deg,#D946EF,#8B5CF6)", borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem" }}>⚕</div>
+            <span style={{ fontSize: "1.1rem", fontWeight: 800, fontFamily: "'Syne',sans-serif", color: "#F8FAFC", letterSpacing: "-0.3px" }}>CarePulse<span style={{ color: "#E879F9" }}>++</span></span>
           </div>
           <nav style={{ display: "flex", gap: "0.25rem", overflowX: "auto" }}>
             {tabs.map(t => (
@@ -882,7 +892,7 @@ export default function App() {
               </div>
 
               {/* Crisis Control Panel */}
-              <div style={{ background: "rgba(15,23,42,0.8)", border: "1px solid rgba(56,189,248,0.2)", borderRadius: 12, padding: "0.5rem 1rem", display: "flex", gap: "1rem", alignItems: "center" }}>
+              <div style={{ background: "rgba(28,15,35,0.8)", border: "1px solid rgba(232,121,249,0.2)", borderRadius: 12, padding: "0.5rem 1rem", display: "flex", gap: "1rem", alignItems: "center" }}>
                 <span style={{ color: "#94A3B8", fontSize: "0.8rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>Crisis Simulations</span>
 
                 <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
@@ -901,7 +911,7 @@ export default function App() {
 
             {/* KPIs row 1 */}
             <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem", flexWrap: "wrap" }}>
-              <KpiCard icon="👥" label="Total Patients" value={patients.length} sub="All admissions" color="#38BDF8" glow />
+              <KpiCard icon="👥" label="Total Patients" value={patients.length} sub="All admissions" color="#E879F9" glow />
               <KpiCard icon="🔴" label="Critical" value={critCount} sub={`${Math.round(critCount / patients.length * 100)}% of patients`} color="#E53E3E" glow />
               <KpiCard icon="🟠" label="Moderate" value={modCount} sub={`${Math.round(modCount / patients.length * 100)}% of patients`} color="#DD6B20" />
               <KpiCard icon="🟢" label="Stable" value={stabCount} sub={`${Math.round(stabCount / patients.length * 100)}% of patients`} color="#38A169" />
@@ -912,7 +922,7 @@ export default function App() {
             <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
               <KpiCard icon="🏥" label="Hospital Stress Index" value={`${(hm.hsi * 100).toFixed(1)}%`} sub={hm.stressStatus} color={hsiColor} glow={hm.hsi >= 0.75} />
               <KpiCard icon="🚑" label="ER Load" value={`${(hm.erLoad * 100).toFixed(0)}%`} sub={hm.erStatus} color={erColor} />
-              <KpiCard icon="🛏" label="ICU Available" value={hm.availIcu} sub={`of ${hm.icu} total ICU beds`} color={hm.availIcu < 5 ? "#E53E3E" : "#38BDF8"} />
+              <KpiCard icon="🛏" label="ICU Available" value={hm.availIcu} sub={`of ${hm.icu} total ICU beds`} color={hm.availIcu < 5 ? "#E53E3E" : "#E879F9"} />
               <KpiCard icon="🫀" label="General Beds" value={hm.availGen} sub={`of ${hm.tb} total beds (${(hm.bedRatio * 100).toFixed(0)}% free)`} color={hm.bedRatio < 0.15 ? "#E53E3E" : hm.bedRatio < 0.25 ? "#DD6B20" : "#38A169"} />
               <KpiCard icon="💨" label="Ventilators" value={hm.ven} sub={`Pressure index: ${hm.ventPres.toFixed(2)}x`} color={hm.ventPres > 1 ? "#E53E3E" : "#10B981"} />
             </div>
@@ -942,7 +952,7 @@ export default function App() {
                     <XAxis dataKey="range" tick={{ fill: "#64748B", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: "#64748B", fontSize: 11 }} axisLine={false} tickLine={false} />
                     <Tooltip contentStyle={{ background: "#0F172A", border: "1px solid #1E293B", borderRadius: 8, color: "#F1F5F9" }} />
-                    <Bar dataKey="count" fill="#38BDF8" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="count" fill="#E879F9" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -976,7 +986,7 @@ export default function App() {
                   const pct = Math.round(val * 100);
                   const color = invert ? (pct > 85 ? "#38A169" : pct > 60 ? "#DD6B20" : "#E53E3E") : (pct > 85 ? "#E53E3E" : pct > 65 ? "#DD6B20" : "#38A169");
                   return (
-                    <div key={label} style={{ background: "rgba(15,23,42,0.5)", borderRadius: 12, padding: "1rem", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div key={label} style={{ background: "rgba(28,15,35,0.5)", borderRadius: 12, padding: "1rem", border: "1px solid rgba(255,255,255,0.05)" }}>
                       <div style={{ fontSize: "0.75rem", color: "#64748B", marginBottom: "0.5rem", fontWeight: 600 }}>{label}</div>
                       <div style={{ height: 6, background: "rgba(255,255,255,0.08)", borderRadius: 3, marginBottom: "0.4rem" }}>
                         <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 3 }} />
@@ -1014,7 +1024,7 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ background: "rgba(15,23,42,0.7)", border: "1px solid rgba(56,189,248,0.1)", borderRadius: 16, overflow: "hidden" }}>
+            <div style={{ background: "rgba(28,15,35,0.7)", border: "1px solid rgba(232,121,249,0.1)", borderRadius: 16, overflow: "hidden" }}>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.84rem" }}>
                   <thead>
@@ -1044,8 +1054,8 @@ export default function App() {
                       const isAlert = p.bed_alert || p.bed_allocation.includes("ESCALATION");
                       return (
                         <tr key={p.patient_id} className="table-row" onClick={() => setSelectedPatient(p)}
-                          style={{ background: i % 2 === 0 ? "rgba(15,23,42,0.4)" : "rgba(15,23,42,0.2)", borderLeft: isAlert ? "3px solid #E53E3E" : "3px solid transparent" }}>
-                          <td style={{ padding: "0.65rem 1rem", color: "#38BDF8", fontWeight: 700 }}>{p.patient_id}</td>
+                          style={{ background: i % 2 === 0 ? "rgba(28,15,35,0.4)" : "rgba(28,15,35,0.2)", borderLeft: isAlert ? "3px solid #E53E3E" : "3px solid transparent" }}>
+                          <td style={{ padding: "0.65rem 1rem", color: "#E879F9", fontWeight: 700 }}>{p.patient_id}</td>
                           <td style={{ padding: "0.65rem 1rem", color: "#94A3B8" }}>{p.age}</td>
                           <td style={{ padding: "0.65rem 1rem", color: "#94A3B8" }}>{p.gender}</td>
                           <td style={{ padding: "0.65rem 1rem", color: "#CBD5E1", whiteSpace: "nowrap" }}>{p.diagnosis_category}</td>
@@ -1055,8 +1065,8 @@ export default function App() {
                           <td style={{ padding: "0.65rem 1rem", color: "#A78BFA", fontWeight: 600 }}>{p.rec_temp}°C</td>
                           <td style={{ padding: "0.65rem 1rem" }}>
                             <span style={{
-                              background: p.bed_allocation.includes("ESCALATION") ? "rgba(239,68,68,0.15)" : p.bed_allocation.includes("ICU") ? "rgba(239,68,68,0.08)" : p.bed_allocation.includes("General") ? "rgba(14,165,233,0.1)" : "rgba(56,189,248,0.05)",
-                              color: p.bed_allocation.includes("ESCALATION") ? "#FCA5A5" : p.bed_allocation.includes("ICU") ? "#F87171" : p.bed_allocation.includes("General") ? "#38BDF8" : "#64748B",
+                              background: p.bed_allocation.includes("ESCALATION") ? "rgba(239,68,68,0.15)" : p.bed_allocation.includes("ICU") ? "rgba(239,68,68,0.08)" : p.bed_allocation.includes("General") ? "rgba(14,165,233,0.1)" : "rgba(232,121,249,0.05)",
+                              color: p.bed_allocation.includes("ESCALATION") ? "#FCA5A5" : p.bed_allocation.includes("ICU") ? "#F87171" : p.bed_allocation.includes("General") ? "#E879F9" : "#64748B",
                               padding: "2px 8px", borderRadius: 6, fontSize: "0.75rem", fontWeight: 600, whiteSpace: "nowrap"
                             }}>{p.bed_allocation}</span>
                           </td>
@@ -1090,7 +1100,7 @@ export default function App() {
               <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                 {Object.entries(WEIGHTS).map(([k, w]) => (
                   <div key={k} style={{ background: "rgba(14,165,233,0.08)", border: "1px solid rgba(14,165,233,0.2)", borderRadius: 8, padding: "0.4rem 0.75rem", textAlign: "center" }}>
-                    <div style={{ color: "#38BDF8", fontWeight: 700, fontSize: "0.9rem" }}>{(w * 100).toFixed(0)}%</div>
+                    <div style={{ color: "#E879F9", fontWeight: 700, fontSize: "0.9rem" }}>{(w * 100).toFixed(0)}%</div>
                     <div style={{ color: "#64748B", fontSize: "0.7rem", textTransform: "uppercase" }}>{k.toUpperCase()}</div>
                   </div>
                 ))}
@@ -1110,7 +1120,7 @@ export default function App() {
             </div>
 
             {/* Deviation breakdown table */}
-            <div style={{ background: "rgba(15,23,42,0.7)", border: "1px solid rgba(56,189,248,0.1)", borderRadius: 16, overflow: "hidden" }}>
+            <div style={{ background: "rgba(28,15,35,0.7)", border: "1px solid rgba(232,121,249,0.1)", borderRadius: 16, overflow: "hidden" }}>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
                   <thead>
@@ -1124,13 +1134,13 @@ export default function App() {
                     {patients.slice().sort((a, b) => b.risk_score - a.risk_score).map((p, i) => {
                       const devCell = (v) => {
                         const pct = Math.round(v * 100);
-                        const bg = pct >= 70 ? "rgba(239,68,68,0.25)" : pct >= 40 ? "rgba(221,107,32,0.2)" : pct >= 15 ? "rgba(251,191,36,0.1)" : "rgba(56,189,248,0.05)";
+                        const bg = pct >= 70 ? "rgba(239,68,68,0.25)" : pct >= 40 ? "rgba(221,107,32,0.2)" : pct >= 15 ? "rgba(251,191,36,0.1)" : "rgba(232,121,249,0.05)";
                         const col = pct >= 70 ? "#F87171" : pct >= 40 ? "#FBBF24" : pct >= 15 ? "#FDE68A" : "#475569";
                         return { bg, col, pct };
                       };
                       return (
-                        <tr key={p.patient_id} className="table-row" onClick={() => setSelectedPatient(p)} style={{ background: i % 2 === 0 ? "rgba(15,23,42,0.4)" : "rgba(15,23,42,0.2)" }}>
-                          <td style={{ padding: "0.5rem 0.75rem", textAlign: "center", color: "#38BDF8", fontWeight: 700 }}>{p.patient_id}</td>
+                        <tr key={p.patient_id} className="table-row" onClick={() => setSelectedPatient(p)} style={{ background: i % 2 === 0 ? "rgba(28,15,35,0.4)" : "rgba(28,15,35,0.2)" }}>
+                          <td style={{ padding: "0.5rem 0.75rem", textAlign: "center", color: "#E879F9", fontWeight: 700 }}>{p.patient_id}</td>
                           <td style={{ padding: "0.5rem 0.75rem", textAlign: "center" }}><SevBadge sev={p.severity} /></td>
                           <td style={{ padding: "0.5rem 0.75rem", textAlign: "center", fontWeight: 700, color: p.risk_score >= 70 ? "#F87171" : p.risk_score >= 40 ? "#FBBF24" : "#34D399" }}>{p.risk_score}</td>
                           {["hr", "bp", "spo2", "fever", "rr", "sugar", "age", "bmi", "hgb", "hydration"].map(k => {
@@ -1161,7 +1171,7 @@ export default function App() {
             </div>
 
             {/* HSI Spotlight */}
-            <div style={{ background: `linear-gradient(135deg, ${hsiColor}18, rgba(15,23,42,0.9))`, border: `1px solid ${hsiColor}40`, borderRadius: 20, padding: "2rem", marginBottom: "1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
+            <div style={{ background: `linear-gradient(135deg, ${hsiColor}18, rgba(28,15,35,0.9))`, border: `1px solid ${hsiColor}40`, borderRadius: 20, padding: "2rem", marginBottom: "1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
               <div>
                 <div style={{ color: "#94A3B8", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "0.5rem" }}>Hospital Stress Index</div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: "0.75rem" }}>
@@ -1211,18 +1221,18 @@ export default function App() {
                 <h4 style={{ margin: "0 0 1.25rem", color: "#94A3B8", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "1px" }}>Physical Resources</h4>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                   {[
-                    { icon: "🛏", label: "Total Beds", val: hm.tb, color: "#38BDF8" },
+                    { icon: "🛏", label: "Total Beds", val: hm.tb, color: "#E879F9" },
                     { icon: "🛏", label: "Gen Available", val: hm.availGen, color: hm.availGen < 20 ? "#E53E3E" : "#38A169" },
                     { icon: "❤️‍🩹", label: "ICU Total", val: hm.icu, color: "#A78BFA" },
                     { icon: "❤️‍🩹", label: "ICU Available", val: hm.availIcu, color: hm.availIcu < 5 ? "#E53E3E" : "#A78BFA" },
                     { icon: "💨", label: "Ventilators", val: hm.ven, color: hm.ventPres > 1 ? "#E53E3E" : "#10B981" },
-                    { icon: "🧑‍⚕️", label: "Doctors", val: hm.doctors, color: "#38BDF8" },
+                    { icon: "🧑‍⚕️", label: "Doctors", val: hm.doctors, color: "#E879F9" },
                     { icon: "👩‍⚕️", label: "Nurses", val: hm.nurses, color: "#818CF8" },
                     { icon: "🚑", label: "Ambulances", val: hm.ambulances, color: hm.ambulances < 3 ? "#E53E3E" : "#F59E0B" },
                     { icon: "🫁", label: "Oxygen Supply", val: `${hm.oxygen}%`, color: hm.oxygen < 85 ? "#E53E3E" : "#10B981" },
                     { icon: "🌡️", label: "Ambient Temp", val: `${hm.ambientTemp}°C`, color: "#94A3B8" },
                   ].map(({ icon, label, val, color }) => (
-                    <div key={label} style={{ background: "rgba(15,23,42,0.5)", borderRadius: 10, padding: "0.75rem", border: "1px solid rgba(255,255,255,0.05)" }}>
+                    <div key={label} style={{ background: "rgba(28,15,35,0.5)", borderRadius: 10, padding: "0.75rem", border: "1px solid rgba(255,255,255,0.05)" }}>
                       <div style={{ fontSize: "1.2rem", marginBottom: "0.25rem" }}>{icon}</div>
                       <div style={{ color, fontWeight: 800, fontSize: "1.1rem", fontFamily: "'Syne',sans-serif" }}>{val}</div>
                       <div style={{ color: "#475569", fontSize: "0.72rem", marginTop: "0.1rem" }}>{label}</div>
@@ -1246,7 +1256,7 @@ export default function App() {
                 <h4 style={{ margin: "0 0 1rem", color: "#94A3B8", fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "1px" }}>Bed Allocation Summary</h4>
                 {Object.entries(patients.reduce((acc, p) => { acc[p.bed_allocation] = (acc[p.bed_allocation] || 0) + 1; return acc; }, {})).map(([bed, cnt]) => (
                   <div key={bed} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.4rem 0", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                    <span style={{ color: bed.includes("ESCALATION") ? "#F87171" : bed.includes("ICU") ? "#FDA4AF" : bed.includes("General") ? "#38BDF8" : bed.includes("Observation") ? "#A78BFA" : "#FBBF24", fontSize: "0.82rem", fontWeight: 600 }}>{bed}</span>
+                    <span style={{ color: bed.includes("ESCALATION") ? "#F87171" : bed.includes("ICU") ? "#FDA4AF" : bed.includes("General") ? "#E879F9" : bed.includes("Observation") ? "#A78BFA" : "#FBBF24", fontSize: "0.82rem", fontWeight: 600 }}>{bed}</span>
                     <span style={{ background: "rgba(255,255,255,0.05)", color: "#94A3B8", padding: "2px 10px", borderRadius: 20, fontSize: "0.78rem", fontWeight: 700 }}>{cnt}</span>
                   </div>
                 ))}
@@ -1269,7 +1279,7 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ background: "rgba(15,23,42,0.7)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 16, overflow: "hidden" }}>
+            <div style={{ background: "rgba(28,15,35,0.7)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 16, overflow: "hidden" }}>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.84rem" }}>
                   <thead>
@@ -1282,11 +1292,11 @@ export default function App() {
                   <tbody>
                     {patients.filter(p => p.emergency_case_flag === 1).sort((a, b) => b.risk_score - a.risk_score).map((p, i) => (
                       <tr key={p.patient_id} className="table-row" onClick={() => setSelectedPatient(p)}
-                        style={{ background: i % 2 === 0 ? "rgba(15,23,42,0.5)" : "rgba(15,23,42,0.3)", borderLeft: `3px solid ${SEV_COLOR[p.severity]}` }}>
+                        style={{ background: i % 2 === 0 ? "rgba(28,15,35,0.5)" : "rgba(28,15,35,0.3)", borderLeft: `3px solid ${SEV_COLOR[p.severity]}` }}>
                         <td style={{ padding: "0.65rem 0.9rem" }}>
                           <span style={{ background: "rgba(239,68,68,0.15)", color: "#F87171", fontWeight: 700, padding: "2px 8px", borderRadius: 6, fontSize: "0.8rem" }}>#{i + 1}</span>
                         </td>
-                        <td style={{ padding: "0.65rem 0.9rem", color: "#38BDF8", fontWeight: 700 }}>{p.patient_id}</td>
+                        <td style={{ padding: "0.65rem 0.9rem", color: "#E879F9", fontWeight: 700 }}>{p.patient_id}</td>
                         <td style={{ padding: "0.65rem 0.9rem", color: "#94A3B8" }}>{p.age}</td>
                         <td style={{ padding: "0.65rem 0.9rem", color: "#94A3B8" }}>{p.gender}</td>
                         <td style={{ padding: "0.65rem 0.9rem", color: "#CBD5E1" }}>{p.diagnosis_category}</td>
@@ -1326,7 +1336,7 @@ export default function App() {
               </div>
             </div>
 
-            <div style={{ background: "rgba(15,23,42,0.7)", border: "1px solid rgba(56,189,248,0.15)", borderRadius: 16, padding: "1.5rem", minHeight: 400 }}>
+            <div style={{ background: "rgba(28,15,35,0.7)", border: "1px solid rgba(232,121,249,0.15)", borderRadius: 16, padding: "1.5rem", minHeight: 400 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(60px, 1fr))", gap: "10px" }}>
                 {patients.map(p => {
                   let bgColor = p.severity === "Critical" ? `rgba(229, 62, 62, ${p.risk_score / 100})` :
@@ -1386,7 +1396,7 @@ export default function App() {
             </div>
 
             {/* Risk score hero */}
-            <div style={{ background: `linear-gradient(135deg, ${SEV_COLOR[selectedPatient.severity]}20, rgba(15,23,42,0.9))`, border: `1px solid ${SEV_COLOR[selectedPatient.severity]}40`, borderRadius: 14, padding: "1.25rem", marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: "1.5rem", flexWrap: "wrap" }}>
+            <div style={{ background: `linear-gradient(135deg, ${SEV_COLOR[selectedPatient.severity]}20, rgba(28,15,35,0.9))`, border: `1px solid ${SEV_COLOR[selectedPatient.severity]}40`, borderRadius: 14, padding: "1.25rem", marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: "1.5rem", flexWrap: "wrap" }}>
               <div style={{ textAlign: "center" }}>
                 <div style={{ color: "#64748B", fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "0.3rem" }}>Risk Score</div>
                 <div style={{ fontSize: "2.5rem", fontWeight: 800, fontFamily: "'Syne',sans-serif", color: SEV_COLOR[selectedPatient.severity], lineHeight: 1 }}>{selectedPatient.risk_score}</div>
@@ -1397,7 +1407,7 @@ export default function App() {
                     { l: "Diet", v: selectedPatient.diet }, { l: "Room Temp", v: `${selectedPatient.rec_temp}°C` },
                     { l: "Bed", v: selectedPatient.bed_allocation }, { l: "ER", v: selectedPatient.er_decision },
                   ].map(({ l, v }) => (
-                    <div key={l} style={{ background: "rgba(15,23,42,0.5)", borderRadius: 8, padding: "0.4rem 0.6rem" }}>
+                    <div key={l} style={{ background: "rgba(28,15,35,0.5)", borderRadius: 8, padding: "0.4rem 0.6rem" }}>
                       <div style={{ color: "#475569", fontSize: "0.7rem", textTransform: "uppercase" }}>{l}</div>
                       <div style={{ color: "#CBD5E1", fontWeight: 600, fontSize: "0.8rem" }}>{v}</div>
                     </div>
@@ -1423,7 +1433,7 @@ export default function App() {
                 const pct = Math.round((d || 0) * 100);
                 const c = pct >= 70 ? "#F87171" : pct >= 40 ? "#FBBF24" : pct >= 15 ? "#86EFAC" : "#38A169";
                 return (
-                  <div key={l} style={{ background: "rgba(15,23,42,0.5)", borderRadius: 10, padding: "0.75rem", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <div key={l} style={{ background: "rgba(28,15,35,0.5)", borderRadius: 10, padding: "0.75rem", border: "1px solid rgba(255,255,255,0.05)" }}>
                     <div style={{ color: "#475569", fontSize: "0.72rem", marginBottom: "0.2rem" }}>{l}</div>
                     <div style={{ color: "#E2E8F0", fontWeight: 700, fontSize: "0.9rem" }}>{v}</div>
                     <div style={{ height: 4, background: "rgba(255,255,255,0.07)", borderRadius: 2, marginTop: "0.4rem" }}>
@@ -1484,7 +1494,7 @@ export default function App() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
                 {/* Basic Info */}
                 <div className="card" style={{ padding: "1.25rem" }}>
-                  <h4 style={{ margin: "0 0 1rem", color: "#38BDF8", fontSize: "0.9rem" }}>Basic Information</h4>
+                  <h4 style={{ margin: "0 0 1rem", color: "#E879F9", fontSize: "0.9rem" }}>Basic Information</h4>
                   <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
                     <div style={{ flex: 1 }}>
                       <label style={{ display: "block", color: "#64748B", fontSize: "0.75rem", marginBottom: "0.4rem" }}>Age</label>
@@ -1524,7 +1534,7 @@ export default function App() {
 
                 {/* Vitals Info */}
                 <div className="card" style={{ padding: "1.25rem" }}>
-                  <h4 style={{ margin: "0 0 1rem", color: "#38BDF8", fontSize: "0.9rem" }}>Clinical Vitals</h4>
+                  <h4 style={{ margin: "0 0 1rem", color: "#E879F9", fontSize: "0.9rem" }}>Clinical Vitals</h4>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem" }}>
                     {[
                       { l: "Heart Rate (bpm)", n: "heart_rate", v: "80" },
@@ -1555,7 +1565,7 @@ export default function App() {
                   { l: "ICU Required", n: "icu" },
                 ].map(f => (
                   <label key={f.n} style={{ display: "flex", alignItems: "center", gap: "0.75rem", cursor: "pointer" }}>
-                    <input name={f.n} type="checkbox" style={{ width: 18, height: 18, accentColor: "#38BDF8" }} />
+                    <input name={f.n} type="checkbox" style={{ width: 18, height: 18, accentColor: "#E879F9" }} />
                     <span style={{ color: "#CBD5E1", fontSize: "0.9rem", fontWeight: 500 }}>{f.l}</span>
                   </label>
                 ))}

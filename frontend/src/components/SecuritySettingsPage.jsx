@@ -11,7 +11,7 @@ const SecuritySettingsPage = ({ user, onBack }) => {
     return (
         <div style={{
             minHeight: "100vh",
-            background: "#060D1F",
+            background: "#120516",
             fontFamily: "'DM Sans', sans-serif",
             color: "#E2E8F0",
             padding: "2rem"
@@ -19,7 +19,7 @@ const SecuritySettingsPage = ({ user, onBack }) => {
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap');
                 * { box-sizing: border-box; }
-                .security-card { background: rgba(15,23,42,0.8); border: 1px solid rgba(239,68,68,0.12); border-radius: 20px; padding: 2rem; backdrop-filter: blur(16px); position: relative; overflow: hidden; }
+                .security-card { background: rgba(28,15,35,0.8); border: 1px solid rgba(239,68,68,0.12); border-radius: 20px; padding: 2rem; backdrop-filter: blur(16px); position: relative; overflow: hidden; }
                 .security-card::before { content: ""; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: #EF4444; opacity: 0.5; }
                 .security-item { display: flex; align-items: flex-start; gap: 1.5rem; padding: 1.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
                 .security-item:last-child { border-bottom: none; }
@@ -31,7 +31,7 @@ const SecuritySettingsPage = ({ user, onBack }) => {
                 .btn-back { background: none; border: 1px solid rgba(100,116,139,0.3); color: #64748B; padding: 0.6rem 1.2rem; border-radius: 10px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: inherit; display: flex; align-items: center; gap: 0.4rem; }
                 .btn-back:hover { border-color: #94A3B8; color: #94A3B8; }
                 .grid-bg { position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(239,68,68,0.015) 1px,transparent 1px),linear-gradient(90deg,rgba(239,68,68,0.015) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0; }
-                .toast { position:fixed; top: 20px; right: 20px; background: #38BDF8; color: white; padding: 12px 24px; border-radius: 12px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index:1000; animation: slideIn 0.3s ease; }
+                .toast { position:fixed; top: 20px; right: 20px; background: #E879F9; color: white; padding: 12px 24px; border-radius: 12px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index:1000; animation: slideIn 0.3s ease; }
                 @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
                 .active-badge { font-size: 0.75rem; background: rgba(16,185,129,0.1); color: #10B981; padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(16,185,129,0.2); font-weight: 700; margin-left: 10px; }
             `}</style>
@@ -81,9 +81,9 @@ const SecuritySettingsPage = ({ user, onBack }) => {
                     </div>
 
                     <div className="security-item" style={{ background: "rgba(0,0,0,0.1)", margin: "1rem -2rem -2rem", padding: "1.5rem 2rem" }}>
-                        <div className="security-icon" style={{ background: "rgba(56,189,248,0.1)", borderColor: "rgba(56,189,248,0.2)" }}>📡</div>
+                        <div className="security-icon" style={{ background: "rgba(232,121,249,0.1)", borderColor: "rgba(232,121,249,0.2)" }}>📡</div>
                         <div className="security-info">
-                            <h4 style={{ color: "#38BDF8" }}>Data Encryption Protocol</h4>
+                            <h4 style={{ color: "#E879F9" }}>Data Encryption Protocol</h4>
                             <p style={{ color: "#94A3B8" }}>All clinical reports and patient records are encrypted at rest and in transit using AES-256 and TLS 1.3 standards.</p>
                         </div>
                     </div>

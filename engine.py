@@ -11,7 +11,7 @@ def bounded_poly_deviation(x: float, n_min: float, n_max: float, c_min: float, c
 def calculate_bp_map(systolic: float, diastolic: float) -> float:
     return (systolic + 2 * diastolic) / 3.0
 
-def calculate_patient_risk(patient: PatientData) -> PatientAnalysisResult:
+def calculate_patient_risk(patient: PatientData, is_oxygen_crisis: bool = False) -> PatientAnalysisResult:
     # 1. Component Indexes
     i_hr = bounded_poly_deviation(patient.heart_rate_bpm, 60, 100, 30, 180)
     
@@ -64,6 +64,13 @@ def calculate_patient_risk(patient: PatientData) -> PatientAnalysisResult:
     else:
         severity = "Critical"
         
+    # --- Oxygen Scarcity Risk Amplifier ---
+    if is_oxygen_crisis and (severity == "Critical" or patient.icu_required_flag == 1):
+        final_risk_score = min(100.0, final_risk_score * 1.25)
+        # Re-evaluate severity in case it jumped from 74->92
+        if final_risk_score >= 75:
+            severity = "Critical"
+        
     # 5. Room Temperature Recommendation
     target_temp = 22.0 # default baseline room temp
     if patient.body_temperature_celsius > 39.0:
@@ -88,7 +95,7 @@ def calculate_patient_risk(patient: PatientData) -> PatientAnalysisResult:
         target_room_temperature=target_temp
     )
 
-def calculate_hospital_stress(hospital: HospitalData) -> HospitalAnalysisResult:
+def calculate_hospital_stress(hospital: HospitalData, critical_patients_count: int = 0) -> HospitalAnalysisResult:
     # 1. Ratios
     r_bed = (hospital.total_beds - hospital.occupied_beds) / max(1, hospital.total_beds)
     r_icu = (hospital.icu_beds_total - hospital.icu_beds_occupied) / max(1, hospital.icu_beds_total)
@@ -125,6 +132,12 @@ def calculate_hospital_stress(hospital: HospitalData) -> HospitalAnalysisResult:
     er_action = "Accepting Triage"
     if r_er > 0.90:
         er_action = "Divert Ambulances"
+        
+    # --- Ventilator Action Logic (Oxygen Scarcity / Top-K) ---
+    if hospital.oxygen_supply_level_percent < 40:
+        bed_action = "OXYGEN CRISIS ALERT | " + bed_action
+        if hospital.ventilators_available < critical_patients_count:
+            er_action = "VENTILATOR SHORTAGE - Triage Sort Top-K Only | " + er_action
         
     if hospital.icu_beds_total - hospital.icu_beds_occupied <= 0:
         bed_action += " | Trigger high-priority facility transfer alert"

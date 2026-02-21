@@ -27,7 +27,7 @@ const ProfilePage = ({ user, setUser, onBack }) => {
     const accessColors = {
         "High": { bg: "rgba(239,68,68,0.15)", border: "#EF4444", text: "#FCA5A5" },
         "Medium": { bg: "rgba(245,158,11,0.15)", border: "#F59E0B", text: "#FCD34D" },
-        "Restricted": { bg: "rgba(99,102,241,0.15)", border: "#6366F1", text: "#A5B4FC" },
+        "Restricted": { bg: "rgba(99,102,241,0.15)", border: "#8B5CF6", text: "#A5B4FC" },
     };
 
     const getInitials = (name) => {
@@ -63,7 +63,7 @@ const ProfilePage = ({ user, setUser, onBack }) => {
     return (
         <div style={{
             minHeight: "100vh",
-            background: "#060D1F",
+            background: "#120516",
             fontFamily: "'DM Sans', sans-serif",
             color: "#E2E8F0",
             padding: "2rem"
@@ -71,23 +71,23 @@ const ProfilePage = ({ user, setUser, onBack }) => {
             <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap');
         * { box-sizing: border-box; }
-        .profile-card { background: rgba(15,23,42,0.8); border: 1px solid rgba(56,189,248,0.12); border-radius: 20px; padding: 2rem; backdrop-filter: blur(16px); }
-        .profile-input { width: 100%; background: rgba(6,13,31,0.8); border: 1px solid rgba(56,189,248,0.2); border-radius: 10px; padding: 0.75rem 1rem; color: #F1F5F9; font-family: inherit; font-size: 0.9rem; outline: none; transition: border 0.2s; }
-        .profile-input:focus { border-color: #38BDF8; box-shadow: 0 0 0 3px rgba(56,189,248,0.1); }
-        .profile-select { width: 100%; background: rgba(6,13,31,0.9); border: 1px solid rgba(56,189,248,0.2); border-radius: 10px; padding: 0.75rem 1rem; color: #F1F5F9; font-family: inherit; font-size: 0.9rem; outline: none; cursor: pointer; }
+        .profile-card { background: rgba(28,15,35,0.8); border: 1px solid rgba(232,121,249,0.12); border-radius: 20px; padding: 2rem; backdrop-filter: blur(16px); }
+        .profile-input { width: 100%; background: rgba(6,13,31,0.8); border: 1px solid rgba(232,121,249,0.2); border-radius: 10px; padding: 0.75rem 1rem; color: #F1F5F9; font-family: inherit; font-size: 0.9rem; outline: none; transition: border 0.2s; }
+        .profile-input:focus { border-color: #E879F9; box-shadow: 0 0 0 3px rgba(232,121,249,0.1); }
+        .profile-select { width: 100%; background: rgba(6,13,31,0.9); border: 1px solid rgba(232,121,249,0.2); border-radius: 10px; padding: 0.75rem 1rem; color: #F1F5F9; font-family: inherit; font-size: 0.9rem; outline: none; cursor: pointer; }
         .btn-save { background: linear-gradient(135deg,#10B981,#059669); color:#fff; border:none; padding:0.75rem 2rem; border-radius:10px; font-size:0.9rem; font-weight:600; cursor:pointer; transition:all 0.2s; font-family:inherit; }
         .btn-save:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(16,185,129,0.4); }
-        .btn-edit { background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.3); color: #38BDF8; padding: 0.6rem 1.5rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
-        .btn-edit:hover { background: rgba(56,189,248,0.2); }
+        .btn-edit { background: rgba(232,121,249,0.1); border: 1px solid rgba(232,121,249,0.3); color: #E879F9; padding: 0.6rem 1.5rem; border-radius: 10px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+        .btn-edit:hover { background: rgba(232,121,249,0.2); }
         .btn-back { background: none; border: 1px solid rgba(100,116,139,0.3); color: #64748B; padding: 0.6rem 1.2rem; border-radius: 10px; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; font-family: inherit; display: flex; align-items: center; gap: 0.4rem; }
         .btn-back:hover { border-color: #94A3B8; color: #94A3B8; }
         .btn-cancel { background: none; border: 1px solid rgba(239,68,68,0.3); color: #FCA5A5; padding: 0.6rem 1.2rem; border-radius: 10px; font-size: 0.85rem; cursor: pointer; font-family: inherit; transition: all 0.2s; }
         .btn-cancel:hover { background: rgba(239,68,68,0.1); }
         .field-label { color: #64748B; font-size: 0.78rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 0.4rem; }
-        .info-value { color: #F1F5F9; font-size: 0.95rem; padding: 0.75rem 1rem; background: rgba(6,13,31,0.4); border-radius: 10px; border: 1px solid rgba(56,189,248,0.08); }
-        .stat-item { background: rgba(6,13,31,0.6); border: 1px solid rgba(56,189,248,0.08); border-radius: 12px; padding: 1rem 1.25rem; text-align: center; }
+        .info-value { color: #F1F5F9; font-size: 0.95rem; padding: 0.75rem 1rem; background: rgba(6,13,31,0.4); border-radius: 10px; border: 1px solid rgba(232,121,249,0.08); }
+        .stat-item { background: rgba(6,13,31,0.6); border: 1px solid rgba(232,121,249,0.08); border-radius: 12px; padding: 1rem 1.25rem; text-align: center; }
         @keyframes gridBg { 0%{opacity:0.4} 50%{opacity:0.7} 100%{opacity:0.4} }
-        .grid-bg { position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(56,189,248,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,0.025) 1px,transparent 1px);background-size:50px 50px;pointer-events:none;z-index:0; }
+        .grid-bg { position:fixed;top:0;left:0;width:100%;height:100%;background-image:linear-gradient(rgba(232,121,249,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(232,121,249,0.025) 1px,transparent 1px);background-size:50px 50px;pointer-events:none;z-index:0; }
         .saved-toast { position:fixed;top:1.5rem;right:1.5rem;background:rgba(16,185,129,0.9);color:white;padding:0.75rem 1.5rem;border-radius:10px;font-weight:600;font-size:0.9rem;z-index:999;backdrop-filter:blur(8px);display:flex;align-items:center;gap:0.5rem; animation: slideIn 0.3s ease; }
         @keyframes slideIn { from{transform:translateX(100px);opacity:0} to{transform:translateX(0);opacity:1} }
         .pulse-dot { width:10px; height:10px; border-radius:50%; animation: pulseDot 1.5s infinite; }
@@ -108,7 +108,7 @@ const ProfilePage = ({ user, setUser, onBack }) => {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "2rem" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
                         <span style={{ fontSize: "1.5rem", fontWeight: 800, fontFamily: "'Syne',sans-serif" }}>
-                            Care<span style={{ color: "#38BDF8" }}>Pulse++</span>
+                            Care<span style={{ color: "#E879F9" }}>Pulse++</span>
                         </span>
                         <span style={{ color: "#334155", fontSize: "1.2rem" }}>/</span>
                         <span style={{ color: "#64748B", fontSize: "0.9rem" }}>Staff Profile</span>
@@ -130,7 +130,7 @@ const ProfilePage = ({ user, setUser, onBack }) => {
                             <div style={{ position: "relative", display: "inline-block", marginBottom: "1.25rem" }}>
                                 <div style={{
                                     width: 100, height: 100, borderRadius: "50%",
-                                    background: "linear-gradient(135deg, #0EA5E9, #10B981)",
+                                    background: "linear-gradient(135deg, #D946EF, #10B981)",
                                     display: "flex", alignItems: "center", justifyContent: "center",
                                     fontSize: "2.2rem", fontWeight: 800, color: "#fff",
                                     fontFamily: "'Syne',sans-serif",
@@ -146,7 +146,7 @@ const ProfilePage = ({ user, setUser, onBack }) => {
                                     position: "absolute", bottom: 4, right: 4,
                                     width: 18, height: 18, borderRadius: "50%",
                                     background: statusColors[user?.status] || "#10B981",
-                                    border: "3px solid #060D1F",
+                                    border: "3px solid #120516",
                                     boxShadow: `0 0 8px ${statusColors[user?.status] || "#10B981"}`
                                 }} />
                             </div>
@@ -154,7 +154,7 @@ const ProfilePage = ({ user, setUser, onBack }) => {
                             <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#F8FAFC", marginBottom: "0.25rem" }}>
                                 {user?.name || "Unknown User"}
                             </div>
-                            <div style={{ color: "#38BDF8", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.75rem" }}>
+                            <div style={{ color: "#E879F9", fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.75rem" }}>
                                 {user?.role || "Staff"}
                             </div>
                             <div style={{
@@ -187,19 +187,19 @@ const ProfilePage = ({ user, setUser, onBack }) => {
                             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                                 <div>
                                     <div className="field-label">Staff ID</div>
-                                    <div style={{ color: "#38BDF8", fontSize: "0.9rem", fontWeight: 700, fontFamily: "monospace", letterSpacing: "1px" }}>
+                                    <div style={{ color: "#E879F9", fontSize: "0.9rem", fontWeight: 700, fontFamily: "monospace", letterSpacing: "1px" }}>
                                         {user?.staff_id || "—"}
                                     </div>
                                 </div>
-                                <div style={{ borderTop: "1px solid rgba(56,189,248,0.08)", paddingTop: "0.75rem" }}>
+                                <div style={{ borderTop: "1px solid rgba(232,121,249,0.08)", paddingTop: "0.75rem" }}>
                                     <div className="field-label">Department</div>
                                     <div style={{ color: "#F1F5F9", fontSize: "0.9rem" }}>{user?.department || "—"}</div>
                                 </div>
-                                <div style={{ borderTop: "1px solid rgba(56,189,248,0.08)", paddingTop: "0.75rem" }}>
+                                <div style={{ borderTop: "1px solid rgba(232,121,249,0.08)", paddingTop: "0.75rem" }}>
                                     <div className="field-label">Email</div>
                                     <div style={{ color: "#F1F5F9", fontSize: "0.85rem", wordBreak: "break-all" }}>{user?.email || "—"}</div>
                                 </div>
-                                <div style={{ borderTop: "1px solid rgba(56,189,248,0.08)", paddingTop: "0.75rem" }}>
+                                <div style={{ borderTop: "1px solid rgba(232,121,249,0.08)", paddingTop: "0.75rem" }}>
                                     <div className="field-label">Last Login</div>
                                     <div style={{ color: "#94A3B8", fontSize: "0.82rem" }}>
                                         {user?.last_login ? new Date(user.last_login).toLocaleString() : "—"}
@@ -324,7 +324,7 @@ const ProfilePage = ({ user, setUser, onBack }) => {
                                 <div className="stat-item">
                                     <div style={{ fontSize: "1.5rem", marginBottom: "0.4rem" }}>🏷️</div>
                                     <div style={{ color: "#64748B", fontSize: "0.75rem", fontWeight: 600, marginBottom: "0.25rem" }}>STAFF ID</div>
-                                    <div style={{ color: "#38BDF8", fontWeight: 700, fontSize: "0.85rem", fontFamily: "monospace" }}>{user?.staff_id || "—"}</div>
+                                    <div style={{ color: "#E879F9", fontWeight: 700, fontSize: "0.85rem", fontFamily: "monospace" }}>{user?.staff_id || "—"}</div>
                                 </div>
                                 <div className="stat-item">
                                     <div style={{ fontSize: "1.5rem", marginBottom: "0.4rem" }}>🔑</div>
