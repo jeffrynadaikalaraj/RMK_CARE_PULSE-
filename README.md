@@ -1,84 +1,138 @@
-# CarePulse++ ⚕️
+# CarePulse++ ⚕️: Deterministic Healthcare Intelligence Engine
 
-CarePulse++ is a unified **Deterministic Healthcare Intelligence Engine** designed for mission-critical hospital environments. It integrates real-time clinical risk monitoring with operational resource management using a purely mathematical and rule-based architecture.
-
-## 🚀 core Philosophy
-The system operates on a **100% Deterministic Framework**, ensuring identical clinical inputs always yield identical operational decisions. It eliminates the "black box" nature of AI in healthcare, providing a transparent, O(n) complexity decision trail for hospital staff.
+CarePulse++ is a unified clinical dashboard and automated decision-support system designed for modern mission-critical hospital environments. It solves the fragmentation of patient monitoring, ICU allocation, and ER load management by integrating them into a single **100% Deterministic Engine**.
 
 ---
 
-## 🏛️ System Architecture
+## 🏛️ 1. System Architecture & Diagram
 
-### 1. Clinical Risk Engine (The "Brain")
-The heart of CarePulse++ is its weighted mathematical modeling of patient vitals.
-- **Weighted Scoring**: Multi-parameter vital analysis (SpO2, BP, HR, Temp, Sugar, BMI, etc.) with strict weight distribution (Σ Weights = 1.0).
-- **Escalation Logic**: Automatic risk multipliers for Chronic Diseases and Emergency cases.
-- **Severity Classification**:
-  - 🔴 **Critical (70-100)**: Immediate ICU priority.
-  - 🟡 **Moderate (40-69)**: Targeted clinical observation.
-  - 🟢 **Stable (0-39)**: Ward observation.
+CarePulse++ follows a **Decoupled SPA (Single Page Application) Architecture** designed for high availability and zero-latency clinical updates.
 
-### 2. Operational Intelligence
-- **Hospital Stress Index (HSI)**: A multi-factor index monitoring Bed/ICU availability, ER Load, Surgical pressure, and Ventilator saturation.
-- **Resource Allocation**: A greedy allocation algorithm that matches high-risk patients to critical care resources.
-- **ER Decision Logic**: Automated redirection protocols based on real-time capacity loads.
+```mermaid
+graph TD
+    subgraph "Frontend Layer (React 19 + Vite)"
+        UI[Glassmorphism Dashboard]
+        CE[Clinical Logic Engine]
+        VC[Recharts Visualization]
+        Store[Local State]
+    end
 
----
+    subgraph "Backend Layer (FastAPI + Python)"
+        API[RESTful API]
+        Auth[JWT & MFA Service]
+        DP[Pandas Data Processor]
+    end
 
-## 💻 Tech Stack
-- **Frontend**: React 19, Vite, Recharts (Visualizations), Vanilla CSS (Glassmorphism).
-- **Backend**: FastAPI (Python), Pandas (Data Processing), SQLAlchemy (ORM).
-- **Database**: SQLite (Auth & Staff records).
-- **Persistence**: Excel (Global Clinical Datasets), JSON (User Sessions).
+    subgraph "Storage Layer"
+        EXCEL[(Global Clinical Excel)]
+        JSON[(User Session JSON)]
+        DB[(Auth SQLite DB)]
+    end
 
----
-
-## 📊 Dataset Requirements
-The system strictly operates on two synchronized Excel files:
-
-### 3.1 Patient Clinical Data (`Patient_Clinical_Data.xlsx`)
-Tracks 17 clinical attributes including:
-- **Vitals**: Heart Rate, Blood Pressure (Sys/Dia), SpO2, Body Temp, Resp Rate.
-- **Metabolics**: Blood Sugar, BMI, Hemoglobin, Hydration levels.
-- **Flags**: Chronic, Emergency, and ICU requirements.
-
-### 3.2 Hospital Resource Data (`Hospital_Resource_Status.xlsx`)
-Monitors 15 operational metrics including:
-- Bed/ICU capacity and occupancy.
-- Ventilator availability.
-- ER Load and medical staff availability (Doctors/Nurses).
-
----
-
-## 🛠️ Installation & Setup
-
-### Prerequisites
-- Python 3.10+
-- Node.js 18+
-
-### Backend Setup
-```bash
-# Navigate to root
-pip install -r backend/requirements.txt
-python backend/main.py
+    UI --> CE
+    CE --> VC
+    UI --> API
+    API --> Auth
+    API --> DP
+    DP --> EXCEL
+    DP --> JSON
+    Auth --> DB
 ```
 
-### Frontend Setup
+---
+
+## ⚙️ 2. The "Clinical Intelligence" Engine (The Math)
+
+The core of CarePulse++ is a deterministic mathematical model that removes ambiguity from clinical decisions.
+
+### 2.1 Deterministic Risk Computation
+Every patient's risk is calculated using a strict weighted deviation model (Σ Weights = 1.0):
+- **Oxygen (SpO2)**: 15% (Critical weight)
+- **Blood Pressure**: 14%
+- **Heart Rate**: 9%
+- **Fever Index**: 10%
+- **Metabolics (Sugar/Hgb)**: 20%
+- **Others**: Distributed across RR, BMI, Age, and Hydration.
+
+**Escalation Logic**:
+- **Multipliers**: Chronic diseases apply a deterministic `1.2x` multiplier.
+- **Additives**: Emergency flags add a fixed `+10` to the risk score.
+- **Overrides**: ICU Required flags force a minimum score of `75` (Critical).
+
+### 2.2 Hospital Stress Index (HSI)
+The **HSI** is calculated as a value between `0.0` and `1.0`:
+- `HSI = (0.28 * BedOccupancy) + (0.28 * IcuOccupancy) + (0.24 * ErLoad) + (0.12 * OpLoad) + (0.08 * VentPressure)`
+- **Classification**:
+  - `HSI < 0.75`: Normal Operations.
+  - `HSI 0.75 - 0.90`: **Capacity Warning**.
+  - `HSI > 0.90`: **Emergency Escalation (Crisis Mode)**.
+
+---
+
+## 🛠️ 3. Detailed Tech Stack
+
+| Layer | Technologies Used | Purpose |
+| :--- | :--- | :--- |
+| **Frontend** | React 19, Vite, Recharts, Axios, Lucide | Real-time UI, Clinical Logic, Data Analysis |
+| **Backend** | FastAPI, Uvicorn, Python 3.10+ | Asynchronous API, Data Orchestration |
+| **Data Science**| Pandas, OpenPyXL | Excel processing & Mathematical modeling |
+| **Security** | PyJWT, SMTP, Bcrypt, Google OAuth | MFA, Tokenization, Zero-Trust Auth |
+| **Design** | Modern Vanilla CSS3, Google Fonts | Glassmorphism, Responsive Grid, Animations |
+| **Storage** | MS Excel (.xlsx), SQLite, JSON | Interoperability & Multi-layer Persistence |
+
+---
+
+## � 4. System Workflow
+
+CarePulse++ operations follow a structured, secure lifecycle:
+
+1.  **Phase 1: Zero-Trust Authentication**: Staff logs in via Google or Password + Mandatory 6-digit Email OTP (MFA).
+2.  **Phase 2: Data Ingestion**: Staff uploads `Patient_Clinical_Data.xlsx`. The system parses rows with **O(n) complexity**.
+3.  **Phase 3: Real-time Analysis**: The JS engine calculates Risk Scores, assigns specific **Diets** (Low-Sodium, High-Fluid, etc.), and recommends **Bed Temperatures**.
+4.  **Phase 4: Operational Decisioning**:
+    *   **Bed Allocation**: Greedy algorithm matches patients to ICU/General beds based on Risk Priority.
+    *   **ER Logic**: Automatically redirects ambulances if ER load exceeds 85%.
+5.  **Phase 5: Digital Twin Persistence**: New entries are synced back to the **Global Excel** and user-specific **Session JSON**.
+
+---
+
+## 📊 5. Data Dictionary
+
+### 5.1 Patient Attributes
+- **Vitals**: Heart Rate, BP (Sys/Dia), SpO2, Temperature, Respiratory Rate.
+- **Clinical Indicators**: Blood Sugar, BMI, Hemoglobin, Hydration Levels.
+- **Demographics**: Age, Gender, Patient ID.
+
+### 5.2 Hospital Metrics
+- **Resources**: Total/Occupied General Beds, ICU Beds, Ventilators.
+- **Staffing**: Available Doctors, Nurses, Ambulance count.
+- **Ops**: Ongoing surgeries, ER Capacity/Occupancy, Environmental Temp.
+
+---
+
+## 🔐 6. Security & Compliance
+- **Rule-Based (No ML/AI)**: Decisions are transparent and verifiable.
+- **MFA Architecture**: Secure SMTP-based OTP hub.
+- **Session Kill-switch**: Global session termination via the Profile Security panel.
+- **Encryption**: AES-256 standards for at-rest and in-transit clinical data.
+
+---
+
+## � 7. Installation
+
 ```bash
+# Clone the repository
+git clone https://github.com/jeffrynadaikalaraj/RMK_CARE_PULSE-.git
+
+# Backend
+pip install -r backend/requirements.txt
+python backend/main.py
+
+# Frontend
 cd frontend
 npm install
 npm run dev
 ```
 
 ---
-
-## 🔐 Security Protocols
-- **JWT Authentication**: Cryptographically signed staff sessions.
-- **MFA Architecture**: Mandatory Email OTP for mission-critical access.
-- **RBAC**: Role-Based Access Control for Doctors, Nurses, and Admin staff.
-- **Transparency**: Every clinical decision (Diet, Bed, Risk) is accompanied by the underlying mathematical justification.
-
----
-
-## ⚖️ License
-Mission-Critical Hospital Environment License - Dedicated to Precision Healthcare.
+*Created for mission-critical healthcare precision.*
